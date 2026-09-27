@@ -106,6 +106,19 @@ export function applyHomography(matrix: Matrix3, point: Point): Point {
   };
 }
 
+/** Closed-form 3x3 inverse (adjugate / determinant) — cheap enough not to need Gaussian elimination. */
+export function invertMatrix3(matrix: Matrix3): Matrix3 | null {
+  const [a, b, c, d, e, f, g, h, i] = matrix;
+  const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-12) return null;
+  const invDet = 1 / det;
+  return [
+    (e * i - f * h) * invDet, (c * h - b * i) * invDet, (b * f - c * e) * invDet,
+    (f * g - d * i) * invDet, (a * i - c * g) * invDet, (c * d - a * f) * invDet,
+    (d * h - e * g) * invDet, (b * g - a * h) * invDet, (a * e - b * d) * invDet,
+  ];
+}
+
 /**
  * Where fret `fret` sits along the neck, as a 0..1 fraction of the distance from
  * the nut to `lastFret`.
@@ -183,4 +196,41 @@ export function projectStringLine(projection: NeckProjection, stringIndex: numbe
     applyHomography(projection.matrix, { x: 0, y }),
     applyHomography(projection.matrix, { x: 1, y }),
   ];
+}
+
+/**
+ * The inverse of `projectPosition`: given a point in the camera image (a
+ * motion centroid, say), the nearest string and fret it falls over.
+ *
+ * This is coordinate geometry, not finger detection — it answers "which
+ * fretboard cell is under this image point", nothing more. A caller feeding
+ * it a hand's rough location gets a rough position back; it has no way to
+ * know whether the point it was given was actually a hand at all.
+ *
+ * Returns null off the strings entirely (above/below the neck) or past the
+ * bridge, where "nearest fret" stops meaning anything.
+ */
+export function unprojectPosition(
+  projection: NeckProjection,
+  point: Point,
+): { readonly string: number; readonly fret: number } | null {
+  const inverse = invertMatrix3(projection.matrix);
+  if (!inverse) return null;
+  const neck = applyHomography(inverse, point);
+
+  // Off the neck lengthwise or across the strings: nothing sensible to return.
+  if (neck.x < -0.05 || neck.x > 1.05 || neck.y < -0.15 || neck.y > 1.15) return null;
+
+  // Invert the physical fret-spacing formula fretFraction() uses:
+  // position(n) = 1 - 2^(-n/12), solved for n given a 0..1 position along the neck.
+  const lastPosition = 1 - Math.pow(2, -projection.lastFret / 12);
+  const target = Math.max(0, Math.min(0.999, neck.x)) * lastPosition;
+  const fret = target <= 0 ? 0 : -12 * Math.log2(1 - target);
+
+  const stringPosition = projection.stringCount <= 1 ? 0 : neck.y * (projection.stringCount - 1);
+
+  return {
+    fret: Math.max(0, Math.min(projection.lastFret, Math.round(fret))),
+    string: Math.max(0, Math.min(projection.stringCount - 1, Math.round(stringPosition))),
+  };
 }

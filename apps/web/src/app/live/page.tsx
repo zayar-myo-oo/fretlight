@@ -3,11 +3,13 @@
 import {
   type MotionResult,
   type TrackingStatus,
+  createNeckProjection,
   getInstrument,
   getScalePositions,
+  unprojectPosition,
 } from "@fretlight/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CameraStage, type OverlayMode } from "@/components/vision/CameraStage";
+import { CameraStage, DETECT_H, DETECT_W, type OverlayMode } from "@/components/vision/CameraStage";
 import { FallbackFretboard } from "@/components/vision/FallbackFretboard";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { Badge } from "@/components/ui/Badge";
@@ -158,6 +160,55 @@ export default function LivePage() {
   useEffect(() => {
     detectionHub.setFretboard(board, instrumentId);
   }, [board, instrumentId]);
+
+  /**
+   * Camera + audio fusion.
+   *
+   * There is no finger-landmark model in this pipeline — only neck-plane
+   * tracking and frame-differencing motion (see `vision/motion.ts`'s own
+   * doc comment on why). So this cannot say "the fingertip is here"; what it
+   * can honestly say is "the scene has been moving around here, and here is
+   * where that projects onto the fretboard we're tracking". That is real
+   * information — a hand doing something is usually the only thing moving
+   * in frame — just coarse, so it is handed to the estimator as a capped,
+   * confidence-scaled hint, exactly like the manual "Hand at" control, and
+   * never as a claimed measurement.
+   *
+   * Audio-only detection is unaffected when the camera is off, tracking is
+   * lost, or the scene is still: the context is cleared and the estimator
+   * falls back to its own inferred hand position, same as on every other
+   * page. Nothing here can block a note from being detected.
+   */
+  useEffect(() => {
+    const corners = tracking?.corners ?? null;
+    const trackingConfidence = tracking?.confidence ?? 0;
+    const centroid = motion?.result.active ? motion.result.centroid : null;
+
+    if (!corners || !centroid || trackingConfidence < 0.5) {
+      detectionHub.setPositionContext({});
+      return;
+    }
+
+    const projection = createNeckProjection(corners, board.fretCount, board.stringCount);
+    const estimate =
+      projection &&
+      unprojectPosition(projection, { x: centroid.x * DETECT_W, y: centroid.y * DETECT_H });
+
+    if (!estimate) {
+      detectionHub.setPositionContext({});
+      return;
+    }
+
+    // Capped well below what real hand evidence would earn — this is a
+    // proxy for "something is moving near here", not a hand measurement.
+    const confidence = Math.min(0.5, trackingConfidence * 0.6);
+    detectionHub.setPositionContext({
+      handFret: { fret: estimate.fret, confidence },
+      stringHint: { string: estimate.string, confidence },
+    });
+
+    return () => detectionHub.setPositionContext({});
+  }, [tracking, motion, board]);
 
   /** Append to the note log on each newly confirmed note. */
   useEffect(() => {

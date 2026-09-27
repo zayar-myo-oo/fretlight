@@ -21,7 +21,6 @@ import { NeckTrackingClient } from "@/lib/vision/neck-tracking-client";
 import type { CalibrationCorners, StoredCalibration } from "@/lib/vision/calibration";
 import { cn } from "@/lib/ui/cn";
 
-/** Detection resolution. Higher costs more and helps surprisingly little. */
 /**
  * Detection resolution.
  *
@@ -29,9 +28,12 @@ import { cn } from "@/lib/ui/cn";
  * about twenty pixels across at that size, so the strings and fret wires that
  * identify it as a fretboard are sub-pixel and there is nothing left to find.
  * At 320x240 they resolve, and the work still fits comfortably in a worker.
+ *
+ * Exported so callers can map a normalised motion centroid (`onMotion`) into
+ * the same pixel space `onTracking`'s corners are reported in.
  */
-const DETECT_W = 320;
-const DETECT_H = 240;
+export const DETECT_W = 320;
+export const DETECT_H = 240;
 
 export type OverlayMode = "auto" | "manual";
 
