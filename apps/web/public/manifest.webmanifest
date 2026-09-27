@@ -1,0 +1,17 @@
+{
+  "name": "Fretlight — Guitar & Bass Practice",
+  "short_name": "Fretlight",
+  "description": "An intelligent practice companion for guitar and bass: real-time pitch detection, interactive fretboard, scales, chords and rhythm — all computed locally.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#04060b",
+  "theme_color": "#04060b",
+  "categories": ["music", "education"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
