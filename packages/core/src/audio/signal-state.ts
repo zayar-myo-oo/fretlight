@@ -17,6 +17,8 @@ export type SignalState =
   | "no_signal"
   /** Something there, too quiet to analyse — turn up, or play harder. */
   | "low_signal"
+  /** Input is hitting the ceiling — turn the gain down before it distorts detection. */
+  | "clipping"
   /** Energy present, but it is not an instrument: speech, room noise, handling. */
   | "noise"
   /** Pitched, but not confidently enough to name. */
@@ -38,6 +40,8 @@ export interface SignalInputs {
   readonly listening: boolean;
   /** Frame level, 0..1. */
   readonly rms: number;
+  /** Loudest sample in the frame, 0..1 — how close the input is to the ceiling. */
+  readonly peak: number;
   /** Instrument-gate confidence, 0..1. */
   readonly instrumentConfidence: number;
   /** Why the gate rejected the frame, when it did. */
@@ -55,6 +59,8 @@ export interface SignalThresholds {
   readonly weak?: number;
   /** Position score needed before the highlight is presented as confirmed. */
   readonly positionConfident?: number;
+  /** Peak at or above this counts as clipping. */
+  readonly clip?: number;
 }
 
 /**
@@ -69,6 +75,7 @@ export function assessSignal(
   const silence = thresholds.silence ?? 0.006;
   const weak = thresholds.weak ?? 0.02;
   const positionConfident = thresholds.positionConfident ?? 0.45;
+  const clip = thresholds.clip ?? 0.97;
 
   const position: PositionState =
     inputs.positionScore === null
@@ -79,6 +86,17 @@ export function assessSignal(
 
   if (!inputs.listening) {
     return { signal: "no_input", position: "position_unknown", message: "No input selected" };
+  }
+
+  // Checked ahead of everything else, including a held note: a clipped input
+  // is actively producing bad data for every stage downstream, so the player
+  // needs to know regardless of what is currently on screen.
+  if (inputs.peak >= clip) {
+    return {
+      signal: "clipping",
+      position,
+      message: "Input is clipping — turn the gain down",
+    };
   }
 
   // A note that is displayed stays displayed. It may be decaying below the

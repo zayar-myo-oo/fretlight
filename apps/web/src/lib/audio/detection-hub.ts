@@ -57,6 +57,7 @@ export interface DetectionSnapshot {
   readonly rejectReason: RejectReason | null;
   readonly clarity: number;
   readonly rms: number;
+  readonly peak: number;
 
   /**
    * The single most likely place the note was played — not every position where
@@ -84,6 +85,7 @@ const EMPTY: DetectionSnapshot = {
   rejectReason: null,
   clarity: 0,
   rms: 0,
+  peak: 0,
   position: null,
   candidates: [],
   noteEventId: 0,
@@ -108,12 +110,33 @@ const EMPTY: DetectionSnapshot = {
  * animation frame — so the UI updates at most once per painted frame no matter
  * how fast the detector runs.
  */
+/**
+ * Baseline the "Noise Gate" calibration control scales. Matches the silence
+ * floor `assessSignal` already uses for the "no signal" UI state, so a
+ * multiplier of 1 lines up with what the player already sees as silence.
+ */
+const NOISE_GATE_BASE = 0.006;
+
+/** How many frames of agreement/silence the stabiliser waits for — the user-facing "Smoothing" control. */
+export type SmoothingLevel = "low" | "medium" | "high";
+const SMOOTHING_PRESETS: Record<SmoothingLevel, { confirmFrames: number; releaseFrames: number }> = {
+  low: { confirmFrames: 2, releaseFrames: 5 },
+  medium: { confirmFrames: 3, releaseFrames: 8 },
+  high: { confirmFrames: 5, releaseFrames: 12 },
+};
+
 class DetectionHub {
   private source: PitchSource = new MockPitchSource();
-  private stabilizer = new NoteStabilizer({ confirmFrames: 3, releaseFrames: 8 });
+  private stabilizer = new NoteStabilizer(SMOOTHING_PRESETS.medium);
   private gate = new InstrumentGate();
   private pitchState = new PitchStateMachine();
   private estimator: PositionEstimator | null = null;
+
+  // --- User calibration, applied without ever restarting the input stream ---
+  private gain = 1;
+  /** Extra multiple of the base silence floor a frame's RMS must clear. 1 = off. */
+  private noiseGateMultiplier = 1;
+  private smoothing: SmoothingLevel = "medium";
 
   private unsubscribeSource: (() => void) | null = null;
   private snapshot: DetectionSnapshot = EMPTY;
@@ -231,6 +254,7 @@ class DetectionHub {
 
     const microphone = new MicrophonePitchSource({
       ...options,
+      gain: this.gain,
       // An interface unplugged mid-session ends its track silently. Surface it
       // and fall back, rather than looking live while hearing nothing.
       onDeviceLost: () => {
@@ -311,14 +335,69 @@ class DetectionHub {
     if (this.snapshot.error !== null) this.patch({ error: null });
   }
 
+  // --- Calibration ------------------------------------------------------
+  //
+  // All three of these apply live, with nothing restarted: gain is a
+  // GainNode's value, the noise gate is an extra check this class already
+  // makes on every frame, and smoothing just swaps which NoteStabilizer
+  // instance handleFrame reads next. None of them touch the MediaStream,
+  // the AudioWorklet or the analysis worker.
+
+  /** Software input gain, 1 = unity. */
+  setGain(gain: number): void {
+    this.gain = gain;
+    if (this.source instanceof MicrophonePitchSource) this.source.setGain(gain);
+  }
+
+  get currentGain(): number {
+    return this.gain;
+  }
+
+  /** How much above the measured noise floor a frame must be to count, 1 = default. */
+  setNoiseGateMultiplier(multiplier: number): void {
+    this.noiseGateMultiplier = Math.max(0.5, multiplier);
+  }
+
+  get currentNoiseGateMultiplier(): number {
+    return this.noiseGateMultiplier;
+  }
+
+  setSmoothing(level: SmoothingLevel): void {
+    if (this.smoothing === level) return;
+    this.smoothing = level;
+    // A fresh stabiliser rather than mutating one in place: it carries a
+    // short median-filter history that would otherwise mix frames analysed
+    // under the old settings with the new ones.
+    this.stabilizer = new NoteStabilizer(SMOOTHING_PRESETS[level]);
+  }
+
+  get currentSmoothing(): SmoothingLevel {
+    return this.smoothing;
+  }
+
+  /** Browser-reported output latency, for the calibration panel's read-only figure. */
+  get estimatedLatencySeconds(): number | null {
+    return this.source instanceof MicrophonePitchSource ? this.source.estimatedLatencySeconds : null;
+  }
+
   // --- The hot path ---------------------------------------------------------
 
   private handleFrame = (frame: PitchFrame): void => {
     const timeMs = frame.time * 1000;
 
+    // 0. The user's noise-gate control, layered on top of the pipeline's own
+    //    adaptive floor. That floor is tuned for a typical room; a player in
+    //    a genuinely noisy one can raise this further without touching the
+    //    input stream. At the default multiplier this never fires — the
+    //    pipeline's own floor already decided the frame was worth analysing.
+    const estimate =
+      this.noiseGateMultiplier > 1 && frame.estimate.rms < NOISE_GATE_BASE * this.noiseGateMultiplier
+        ? { ...frame.estimate, frequency: null, silent: true }
+        : frame.estimate;
+
     // 1. Is this the instrument at all? Speech and room noise stop here.
     const verdict = this.gate.evaluate(
-      frame.estimate,
+      estimate,
       frame.estimate.quality ?? {
         clarity: frame.estimate.clarity,
         // Without spectral analysis, fall back to neutral values so the gate
@@ -334,8 +413,8 @@ class DetectionHub {
     // 2. Per-frame jitter removal. Only frames the gate accepted get through, so
     //    a conversation never reaches the stabiliser's agreement counter.
     const event: StabilizerEvent = verdict.accepted
-      ? this.stabilizer.push(frame.estimate)
-      : this.stabilizer.push({ ...frame.estimate, frequency: null, silent: true });
+      ? this.stabilizer.push(estimate)
+      : this.stabilizer.push({ ...estimate, frequency: null, silent: true });
 
     const stabilised =
       event.type === "confirmed" || event.type === "sustained" || event.type === "candidate"
@@ -385,6 +464,7 @@ class DetectionHub {
       rejectReason: verdict.accepted ? null : verdict.reason,
       clarity: frame.estimate.clarity,
       rms: frame.estimate.rms,
+      peak: frame.estimate.peak,
       position,
       candidates,
       noteEventId: this.noteCounter,
@@ -412,6 +492,7 @@ class DetectionHub {
       // Bucketed: the meter does not need frame-accurate values, and this stops
       // the audio slice invalidating on every single frame.
       signalStrength: Math.round(snap.rms * 100) / 100,
+      peakLevel: Math.round(snap.peak * 100) / 100,
       error: snap.error,
     });
 
@@ -429,6 +510,7 @@ class DetectionHub {
     const assessment = assessSignal({
       listening: snap.listening,
       rms: snap.rms,
+      peak: snap.peak,
       instrumentConfidence: snap.instrumentConfidence,
       rejectReason: snap.rejectReason,
       display: snap.uiState,

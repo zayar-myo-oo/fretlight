@@ -10,7 +10,7 @@ import {
 import { NoiseFloorTracker } from "./noise-floor";
 import { OnsetDetector } from "./onset";
 import type { FrameQuality, PitchDetectorOptions, PitchEstimate } from "./types";
-import { YinDetector, computeRms } from "./yin";
+import { YinDetector, computePeak, computeRms } from "./yin";
 
 export interface PitchPipelineOptions extends PitchDetectorOptions {
   /** Override the automatic decimation factor. 1 disables decimation entirely. */
@@ -119,13 +119,14 @@ export class PitchPipeline {
     // Gate on the *raw* level: conditioning and decimation on silence is wasted
     // work, and this is the common case between notes.
     const rawRms = computeRms(frame);
+    const rawPeak = computePeak(frame);
     this.noiseFloor?.observe(rawRms);
     const threshold = this.noiseFloor ? this.noiseFloor.threshold : this.rmsThreshold;
     if (rawRms < threshold) {
       // Keep the onset baseline tracking through silence, otherwise the first
       // note after a pause is measured against a stale reference level.
       this.onsetDetector?.push(rawRms);
-      return { frequency: null, clarity: 0, rms: rawRms, silent: true };
+      return { frequency: null, clarity: 0, rms: rawRms, peak: rawPeak, silent: true };
     }
 
     if (this.scratch.length !== frame.length) this.scratch = new Float32Array(frame.length);
@@ -136,8 +137,10 @@ export class PitchPipeline {
     const estimate = this.detector.detect(decimated);
 
     // Report the level the caller can reason about — the input's, not the
-    // filtered and downsampled signal's.
-    const base = { ...estimate, rms: rawRms };
+    // filtered and downsampled signal's. Peak specifically must come from the
+    // raw frame: it exists to catch clipping at the input stage, which
+    // conditioning and decimation would already have smoothed away.
+    const base = { ...estimate, rms: rawRms, peak: rawPeak };
     if (!this.spectrum || !this.onsetDetector) return base;
 
     const magnitudes = this.spectrum.analyze(decimated);

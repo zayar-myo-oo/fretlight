@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { getInstrument } from "@fretlight/core";
 import { useSession } from "@/store/session";
+import { useCalibration } from "@/hooks/useCalibration";
 import { useDetection } from "@/hooks/useDetection";
 import { useMounted } from "@/hooks/useMounted";
 import { resolveTuning } from "@/lib/tuning/resolve-tuning";
@@ -17,6 +18,9 @@ import { NAV_ITEMS } from "./nav";
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // Applies calibration (gain/noise gate/smoothing) to detectionHub wherever
+  // the player left the settings, regardless of which page opened the input.
+  useCalibration();
 
   return (
     <div className="stack flex min-h-dvh flex-col md:flex-row">

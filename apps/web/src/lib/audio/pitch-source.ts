@@ -36,5 +36,6 @@ export const SILENT_ESTIMATE: PitchEstimate = {
   frequency: null,
   clarity: 0,
   rms: 0,
+  peak: 0,
   silent: true,
 };

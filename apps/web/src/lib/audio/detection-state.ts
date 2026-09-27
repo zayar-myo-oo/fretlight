@@ -29,6 +29,8 @@ export interface AudioState {
   readonly deviceLabel: string;
   /** 0..1 input level, for the meter. */
   readonly signalStrength: number;
+  /** 0..1 peak level — how close the input is to clipping. */
+  readonly peakLevel: number;
   readonly error: string | null;
 }
 
@@ -72,6 +74,7 @@ export const EMPTY_AUDIO_STATE: AudioState = {
   deviceId: null,
   deviceLabel: "Virtual instrument",
   signalStrength: 0,
+  peakLevel: 0,
   error: null,
 };
 

@@ -8,6 +8,7 @@ const frame = (frequency: number | null, clarity = 0.95): PitchEstimate => ({
   frequency,
   clarity: frequency === null ? 0 : clarity,
   rms: frequency === null ? 0 : 0.2,
+  peak: frequency === null ? 0 : 0.3,
   silent: frequency === null,
 });
 

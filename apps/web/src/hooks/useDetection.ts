@@ -27,6 +27,7 @@ const SERVER_SNAPSHOT: DetectionSnapshot = {
   rejectReason: null,
   clarity: 0,
   rms: 0,
+  peak: 0,
   position: null,
   candidates: [],
   noteEventId: 0,

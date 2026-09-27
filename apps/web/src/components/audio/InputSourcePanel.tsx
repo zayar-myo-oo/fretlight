@@ -4,6 +4,7 @@ import { type Fretboard, getInstrument, noteAt } from "@fretlight/core";
 import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { CalibrationPanel } from "@/components/audio/CalibrationPanel";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Slider } from "@/components/ui/Slider";
@@ -162,7 +163,7 @@ export function InputSourcePanel({ board, className }: { board: Fretboard; class
                 {audio.deviceLabel}
               </span>
             </div>
-            <LevelMeter rms={audio.signalStrength} />
+            <LevelMeter rms={audio.signalStrength} clipping={audio.peakLevel >= 0.97} />
             <p className="mt-1.5 min-h-[16px] text-[11px] text-[var(--color-ink-faint)]">
               {signal.message}
             </p>
@@ -171,6 +172,8 @@ export function InputSourcePanel({ board, className }: { board: Fretboard; class
               tuned for speech and would strip a sustained bass fundamental. Detection runs
               in a worker on this device; no audio is uploaded.
             </p>
+
+            <CalibrationPanel live={live} />
           </div>
         ) : (
           <VirtualControls board={board} />
@@ -190,6 +193,8 @@ function SignalBadge({ state, live }: { state: string; live: boolean }) {
       return <Badge tone="signal">listening</Badge>;
     case "low_signal":
       return <Badge tone="warn">low signal</Badge>;
+    case "clipping":
+      return <Badge tone="warn">clipping</Badge>;
     case "noise":
       return <Badge tone="warn">noise</Badge>;
     case "no_signal":
@@ -199,18 +204,23 @@ function SignalBadge({ state, live }: { state: string; live: boolean }) {
   }
 }
 
-function LevelMeter({ rms }: { rms: number }) {
+function LevelMeter({ rms, clipping }: { rms: number; clipping: boolean }) {
   // Logarithmic: a linear meter spends most of its travel on levels nobody plays at.
   const db = rms > 0 ? 20 * Math.log10(rms) : -80;
   const percent = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
   const hot = db > -6;
 
   return (
-    <div className="relative h-2.5 overflow-hidden rounded-full bg-[var(--color-void)] ring-1 ring-[var(--color-hairline)]">
+    <div
+      className={cn(
+        "relative h-2.5 overflow-hidden rounded-full bg-[var(--color-void)] ring-1 transition-shadow",
+        clipping ? "ring-2 ring-[var(--color-error)]" : "ring-[var(--color-hairline)]",
+      )}
+    >
       <div
         className={cn(
           "h-full rounded-full transition-[width] duration-75",
-          hot ? "bg-[var(--color-error)]" : "bg-[var(--color-signal)]",
+          clipping || hot ? "bg-[var(--color-error)]" : "bg-[var(--color-signal)]",
         )}
         style={{ width: `${percent}%` }}
       />

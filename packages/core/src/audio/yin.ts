@@ -39,13 +39,14 @@ export class YinDetector {
 
   detect(frame: Float32Array): PitchEstimate {
     const rms = computeRms(frame);
+    const peak = computePeak(frame);
     if (rms < this.rmsThreshold) {
-      return { frequency: null, clarity: 0, rms, silent: true };
+      return { frequency: null, clarity: 0, rms, peak, silent: true };
     }
 
     const tauMax = Math.min(this.tauMax, Math.floor(frame.length / 2) - 1);
     if (tauMax <= this.tauMin) {
-      return { frequency: null, clarity: 0, rms, silent: false };
+      return { frequency: null, clarity: 0, rms, peak, silent: false };
     }
 
     const cmnd = this.cmnd;
@@ -96,10 +97,10 @@ export class YinDetector {
     const clarity = Math.max(0, Math.min(1, 1 - cmnd[tauEstimate]!));
 
     if (frequency < this.sampleRate / this.tauMax || frequency > this.sampleRate / this.tauMin) {
-      return { frequency: null, clarity, rms, silent: false };
+      return { frequency: null, clarity, rms, peak, silent: false };
     }
 
-    return { frequency, clarity, rms, silent: false };
+    return { frequency, clarity, rms, peak, silent: false };
   }
 
   /**
@@ -179,6 +180,16 @@ export function computeRms(frame: Float32Array): number {
     sum += sample * sample;
   }
   return Math.sqrt(sum / frame.length);
+}
+
+/** Largest absolute sample in the frame, 0..1 — how close the input is to clipping. */
+export function computePeak(frame: Float32Array): number {
+  let peak = 0;
+  for (let i = 0; i < frame.length; i++) {
+    const magnitude = Math.abs(frame[i]!);
+    if (magnitude > peak) peak = magnitude;
+  }
+  return peak;
 }
 
 /** Convenience wrapper for one-shot analysis (tests, benchmarks, offline files). */

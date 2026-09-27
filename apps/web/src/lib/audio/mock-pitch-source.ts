@@ -128,6 +128,10 @@ export class MockPitchSource implements PitchSource {
         frequency,
         clarity,
         rms,
+        // A plucked string's peak sits a bit above its RMS (crest factor);
+        // this never approaches clipping, which is exactly right for a
+        // synthetic source that can never actually clip.
+        peak: Math.min(1, rms * 1.4),
         silent: false,
         // Plausible values for a plucked string, so the virtual instrument goes
         // through the instrument gate rather than around it. If the gate ever

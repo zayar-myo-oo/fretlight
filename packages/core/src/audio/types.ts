@@ -6,6 +6,8 @@ export interface PitchEstimate {
   readonly clarity: number;
   /** RMS level of the analysed frame, 0..1. */
   readonly rms: number;
+  /** Loudest single sample in the frame, 0..1 — how close the input is to clipping. */
+  readonly peak: number;
   /** True when the frame was rejected by the amplitude gate rather than by clarity. */
   readonly silent: boolean;
   /**

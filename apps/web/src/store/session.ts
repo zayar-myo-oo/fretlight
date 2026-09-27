@@ -12,6 +12,7 @@ import {
 } from "@fretlight/core";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { SmoothingLevel } from "@/lib/audio/detection-hub";
 
 export type NoteLabelMode = "note" | "degree" | "interval";
 
@@ -48,6 +49,14 @@ export interface SessionState {
   showOutOfScale: boolean;
   /** Play a short chime when the tuner reading lands in tune. */
   tunerChimeEnabled: boolean;
+
+  // --- Input calibration ---
+  /** Software input gain, 1 = unity. */
+  inputGain: number;
+  /** Extra multiple of the noise floor a signal must clear, 1 = off. */
+  inputNoiseGate: number;
+  /** How many frames of agreement/silence the detector waits for. */
+  inputSmoothing: SmoothingLevel;
 
   // --- Metronome ---
   bpm: number;
@@ -107,6 +116,10 @@ export const useSession = create<SessionState>()(
       lowStringOnTop: false,
       showOutOfScale: false,
       tunerChimeEnabled: true,
+
+      inputGain: 1,
+      inputNoiseGate: 1,
+      inputSmoothing: "medium",
 
       bpm: 90,
       timeSignature: { beats: 4, value: 4 },

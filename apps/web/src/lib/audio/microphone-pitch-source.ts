@@ -16,6 +16,8 @@ export interface MicrophoneOptions {
    * a microphone in a room.
    */
   readonly inputType?: InputType;
+  /** Software gain applied before analysis, 1 = unity. */
+  readonly gain?: number;
   /** Called when the device goes away mid-session — unplugged, or taken over. */
   readonly onDeviceLost?: () => void;
 }
@@ -53,6 +55,7 @@ export class MicrophonePitchSource implements PitchSource {
 
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
+  private gainNode: GainNode | null = null;
   private node: AudioWorkletNode | null = null;
   private worker: Worker | null = null;
   private listeners = new Set<(frame: PitchFrame) => void>();
@@ -143,7 +146,15 @@ export class MicrophonePitchSource implements PitchSource {
       for (const listener of this.listeners) listener(frame);
     };
 
-    context.createMediaStreamSource(stream).connect(node);
+    // A software gain stage ahead of analysis. getUserMedia's own AGC is
+    // disabled (it pumps a decaying note), so this is the only volume control
+    // there is — set once at unity by default, adjustable live via `setGain`
+    // without touching the stream or restarting anything downstream.
+    const gainNode = context.createGain();
+    gainNode.gain.value = this.options.gain ?? 1;
+    this.gainNode = gainNode;
+
+    context.createMediaStreamSource(stream).connect(gainNode).connect(node);
 
     const track = stream.getAudioTracks()[0];
     if (track) {
@@ -166,6 +177,8 @@ export class MicrophonePitchSource implements PitchSource {
     this.node?.port.postMessage("stop");
     this.node?.disconnect();
     this.node = null;
+    this.gainNode?.disconnect();
+    this.gainNode = null;
 
     this.worker?.terminate();
     this.worker = null;
@@ -183,6 +196,20 @@ export class MicrophonePitchSource implements PitchSource {
     if (!this.running) return;
     await this.stop();
     await this.start();
+  }
+
+  /** Live gain adjustment — no restart, takes effect on the next audio block. */
+  setGain(gain: number): void {
+    this.options = { ...this.options, gain };
+    if (this.gainNode) this.gainNode.gain.value = gain;
+  }
+
+  /** Seconds of output-path latency the browser reports, for a calibration readout. */
+  get estimatedLatencySeconds(): number | null {
+    if (!this.context) return null;
+    const base = this.context.baseLatency ?? 0;
+    const output = this.context.outputLatency ?? 0;
+    return base + output;
   }
 
   private async requestStream(): Promise<MediaStream> {
