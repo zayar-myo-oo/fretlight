@@ -1,0 +1,20 @@
+{
+  "name": "fretlight-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Guitar & Bass intelligent practice platform — local-first DSP, music theory, CV and holographic visualisation.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @fretlight/web",
+    "build": "npm run build --workspace @fretlight/core && npm run build --workspace @fretlight/web",
+    "test": "npm run test --workspace @fretlight/core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspace @fretlight/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

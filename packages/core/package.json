@@ -1,0 +1,23 @@
+{
+  "name": "@fretlight/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-agnostic engines: music theory, fretboard, DSP, practice, timing. No DOM, no browser APIs.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11"
+  }
+}

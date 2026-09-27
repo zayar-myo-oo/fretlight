@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design tokens
+   The product should read as instrument hardware, not as a SaaS dashboard:
+   near-black chassis, a single cyan "signal" accent, violet for theory
+   context, and colour used sparingly so that a lit note actually means
+   something.
+   ========================================================================== */
+@theme {
+  --color-void: #04060b;
+  --color-chassis: #080c14;
+  --color-panel: #0d131f;
+  --color-panel-raised: #131a29;
+  --color-hairline: #1e2839;
+  --color-hairline-bright: #2b3a52;
+
+  --color-ink: #eef4ff;
+  --color-ink-dim: #93a3bd;
+  --color-ink-faint: #5a6a85;
+
+  /* Signal — live audio, detected notes, the "on" state. */
+  --color-signal: #22e0d6;
+  --color-signal-bright: #7efff6;
+  --color-signal-deep: #0a5f5c;
+
+  /* Theory — scales, degrees, harmonic context. */
+  --color-theory: #8b7cff;
+  --color-theory-bright: #b8aeff;
+
+  /* Root notes get their own colour: they are the anchor of everything. */
+  --color-root: #ff5c8a;
+  --color-root-bright: #ff9ab5;
+
+  --color-correct: #39e08b;
+  --color-warn: #ffc247;
+  --color-error: #ff5470;
+
+  --font-display: var(--font-space-grotesk), "SF Pro Display", system-ui, sans-serif;
+  --font-sans: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-panel: 18px;
+
+  --ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+@layer base {
+  * {
+    border-color: var(--color-hairline);
+  }
+
+  html {
+    background: var(--color-void);
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Ambient room light. Two soft pools plus a fine grid, fixed so it reads as
+     the surface the UI sits on rather than as page content. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(900px 520px at 12% -10%, rgba(34, 224, 214, 0.10), transparent 62%),
+      radial-gradient(760px 480px at 92% 6%, rgba(139, 124, 255, 0.10), transparent 60%),
+      radial-gradient(1100px 700px at 50% 110%, rgba(255, 92, 138, 0.05), transparent 65%);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.35;
+    background-image:
+      linear-gradient(to right, rgba(148, 176, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 176, 255, 0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 78%);
+  }
+
+  ::selection {
+    background: rgba(34, 224, 214, 0.28);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-hairline-bright);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+/* ==========================================================================
+   Component primitives
+   ========================================================================== */
+@layer components {
+  .surface {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 42%),
+      var(--color-panel);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-panel);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+      0 24px 60px -32px rgba(0, 0, 0, 0.9);
+  }
+
+  .surface-raised {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 45%),
+      var(--color-panel-raised);
+    border: 1px solid var(--color-hairline-bright);
+    border-radius: var(--radius-panel);
+  }
+
+  /* Small uppercase label used throughout, borrowed from hardware silkscreen. */
+  .hud-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .glow-signal {
+    box-shadow: 0 0 0 1px rgba(34, 224, 214, 0.4), 0 0 28px -4px rgba(34, 224, 214, 0.55);
+  }
+  .glow-root {
+    box-shadow: 0 0 0 1px rgba(255, 92, 138, 0.45), 0 0 26px -6px rgba(255, 92, 138, 0.6);
+  }
+  .glow-correct {
+    box-shadow: 0 0 0 1px rgba(57, 224, 139, 0.45), 0 0 30px -4px rgba(57, 224, 139, 0.55);
+  }
+  .glow-error {
+    box-shadow: 0 0 0 1px rgba(255, 84, 112, 0.5), 0 0 30px -4px rgba(255, 84, 112, 0.5);
+  }
+
+  .text-gradient {
+    background: linear-gradient(120deg, var(--color-ink) 10%, var(--color-signal-bright) 55%, var(--color-theory-bright) 95%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* ==========================================================================
+   Motion
+   Every animation here is compositor-only (transform/opacity) so it never
+   competes with the audio thread.
+   ========================================================================== */
+@layer utilities {
+  @keyframes pulse-ring {
+    0% { transform: scale(0.85); opacity: 0.75; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+  @keyframes note-pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    45% { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes sweep {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(320%); }
+  }
+  @keyframes rise-fade {
+    0% { transform: translateY(6px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  .animate-pulse-ring { animation: pulse-ring 1.1s var(--ease-snap) infinite; }
+  .animate-note-pop { animation: note-pop 260ms var(--ease-snap) both; }
+  .animate-sweep { animation: sweep 2.4s linear infinite; }
+  .animate-rise { animation: rise-fade 320ms var(--ease-snap) both; }
+  .animate-breathe { animation: breathe 2.6s ease-in-out infinite; }
+
+  .stack { position: relative; z-index: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

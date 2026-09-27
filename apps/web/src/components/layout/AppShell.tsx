@@ -1,0 +1,169 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
+import { getInstrument, getTuning } from "@fretlight/core";
+import { useSession } from "@/store/session";
+import { useDetection } from "@/hooks/useDetection";
+import { useMounted } from "@/hooks/useMounted";
+import { cn } from "@/lib/ui/cn";
+import { NAV_ITEMS } from "./nav";
+
+/**
+ * Application chrome: an icon rail on desktop, a tab bar on phones.
+ * Kept deliberately thin — the practice surface is the product, not the nav.
+ */
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
+  return (
+    <div className="stack flex min-h-dvh flex-col md:flex-row">
+      {/* Desktop rail */}
+      <nav className="sticky top-0 z-30 hidden h-dvh w-[76px] shrink-0 flex-col items-center gap-1 border-r border-[var(--color-hairline)] bg-[rgba(8,12,20,0.72)] py-5 backdrop-blur-xl md:flex">
+        <Link href="/" className="mb-5 flex flex-col items-center gap-1.5" aria-label="Fretlight home">
+          <Mark />
+        </Link>
+        {NAV_ITEMS.map((item) => (
+          <RailLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+        ))}
+        <div className="mt-auto">
+          <ListeningDot />
+        </div>
+      </nav>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar />
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-10">
+          {children}
+        </main>
+      </div>
+
+      {/* Mobile tab bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-[var(--color-hairline)] bg-[rgba(8,12,20,0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
+        {NAV_ITEMS.map((item) => {
+          const active = isActive(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors",
+                active ? "text-[var(--color-signal)]" : "text-[var(--color-ink-faint)]",
+              )}
+            >
+              <Icon path={item.icon} />
+              <span className="text-[9px] tracking-wider uppercase">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function isActive(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
+function RailLink({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      title={item.hint}
+      className={cn(
+        "group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-200",
+        active
+          ? "bg-[rgba(34,224,214,0.12)] text-[var(--color-signal)]"
+          : "text-[var(--color-ink-faint)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--color-ink-dim)]",
+      )}
+    >
+      {active && (
+        <span className="absolute left-[-13px] h-6 w-[3px] rounded-r-full bg-[var(--color-signal)] shadow-[0_0_10px_var(--color-signal)]" />
+      )}
+      <Icon path={item.icon} />
+      <span className="pointer-events-none absolute left-[60px] z-50 hidden whitespace-nowrap rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2.5 py-1.5 text-xs text-[var(--color-ink)] group-hover:block">
+        {item.label}
+      </span>
+    </Link>
+  );
+}
+
+function TopBar() {
+  const instrumentId = useSession((s) => s.instrumentId);
+  const tuningId = useSession((s) => s.tuningId);
+  const mounted = useMounted();
+
+  const instrument = getInstrument(instrumentId);
+  const tuning = getTuning(tuningId);
+
+  return (
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] bg-[rgba(4,6,11,0.72)] px-4 py-3 backdrop-blur-xl md:px-8">
+      <div className="flex items-center gap-3">
+        <div className="md:hidden">
+          <Mark compact />
+        </div>
+        {mounted && instrument && tuning && (
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-sm font-semibold">{instrument.name}</span>
+            <span className="readout text-[11px] text-[var(--color-ink-faint)]">
+              {tuning.strings.join(" ")}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="hud-label hidden sm:inline">Offline capable</span>
+        <ListeningDot />
+      </div>
+    </header>
+  );
+}
+
+function ListeningDot() {
+  const { listening, sourceLabel, rms } = useDetection();
+  return (
+    <span
+      className="flex items-center gap-2"
+      title={listening ? `Listening — ${sourceLabel}` : "Not listening"}
+    >
+      <span className="relative flex h-2.5 w-2.5">
+        {listening && (
+          <span
+            className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-signal)] opacity-60 animate-pulse-ring"
+            style={{ animationDuration: rms > 0.02 ? "0.7s" : "1.6s" }}
+          />
+        )}
+        <span
+          className={cn(
+            "relative inline-flex h-2.5 w-2.5 rounded-full",
+            listening ? "bg-[var(--color-signal)]" : "bg-[var(--color-hairline-bright)]",
+          )}
+        />
+      </span>
+      <span className="hud-label hidden md:inline">{listening ? "Live" : "Idle"}</span>
+    </span>
+  );
+}
+
+function Icon({ path }: { path: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d={path} />
+    </svg>
+  );
+}
+
+function Mark({ compact }: { compact?: boolean }) {
+  return (
+    <span className="flex items-center gap-2">
+      <svg width={compact ? 20 : 26} height={compact ? 20 : 26} viewBox="0 0 26 26" fill="none">
+        <rect x="1" y="1" width="24" height="24" rx="7" stroke="var(--color-signal)" strokeWidth="1.3" opacity="0.5" />
+        <path d="M7 18.5 19 7.5" stroke="var(--color-signal)" strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="9.5" cy="16" r="2.2" fill="var(--color-root)" />
+        <circle cx="16.5" cy="10" r="2.2" fill="var(--color-signal)" />
+      </svg>
+      {compact && <span className="text-sm font-semibold tracking-tight">Fretlight</span>}
+    </span>
+  );
+}
