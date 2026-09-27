@@ -184,12 +184,18 @@ export class PositionEstimator {
 
     let best = scored[0]!;
 
-    // Hysteresis: stay where we are unless a rival is clearly better.
+    // Hysteresis: stay where we are unless a rival is clearly better. A shaky
+    // pitch reading raises that bar further — if the pitch detector itself is
+    // unsure, a rival candidate's higher score is as likely to be noise as it
+    // is to be a real move, so it should have to win by more before it is
+    // allowed to steal the highlight from the held position.
     if (previous) {
+      const pitchConfidence = clamp01(context.pitchConfidence ?? 1);
+      const effectiveStickiness = this.stickiness * (1 + 2 * (1 - pitchConfidence));
       const heldNow = scored.find(
         (candidate) => candidate.string === previous.string && candidate.fret === previous.fret,
       );
-      if (heldNow && heldNow.score >= best.score - this.stickiness) {
+      if (heldNow && heldNow.score >= best.score - effectiveStickiness) {
         best = heldNow;
       }
     }

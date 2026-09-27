@@ -100,6 +100,54 @@ describe("hysteresis", () => {
   });
 });
 
+describe("pitch confidence dampens hysteresis", () => {
+  it("holds through a wobble that a confident reading would have moved on", () => {
+    const midi = noteToMidi("A2")!;
+    const rivalHint = { stringHint: { string: 1, confidence: 0.55 } };
+
+    const confident = new PositionEstimator(guitar, { stickiness: 0.1 });
+    confident.estimate(midi, { expected: { string: 0, fret: 5 } }, 1000);
+    const movedWithHighConfidence = confident.estimate(
+      midi,
+      { ...rivalHint, pitchConfidence: 1 },
+      1100,
+    ).best;
+
+    const shaky = new PositionEstimator(guitar, { stickiness: 0.1 });
+    shaky.estimate(midi, { expected: { string: 0, fret: 5 } }, 1000);
+    const heldWithLowConfidence = shaky.estimate(
+      midi,
+      { ...rivalHint, pitchConfidence: 0 },
+      1100,
+    ).best;
+
+    // The same rival evidence is enough to move a confident reading but not
+    // enough to move one the pitch detector itself is unsure about — a
+    // shaky reading should not be allowed to force a move off a good lock.
+    expect(`${movedWithHighConfidence!.string}:${movedWithHighConfidence!.fret}`).not.toBe("0:5");
+    expect(`${heldWithLowConfidence!.string}:${heldWithLowConfidence!.fret}`).toBe("0:5");
+  });
+
+  it("defaults to full confidence when the caller supplies none", () => {
+    // Callers that never touched pitchConfidence (every call site before this
+    // feature existed) must see identical behaviour to before.
+    const midi = noteToMidi("A2")!;
+    const withDefault = new PositionEstimator(guitar, { stickiness: 0.1 });
+    withDefault.estimate(midi, { expected: { string: 0, fret: 5 } }, 1000);
+    const a = withDefault.estimate(midi, { stringHint: { string: 1, confidence: 0.55 } }, 1100).best;
+
+    const explicit = new PositionEstimator(guitar, { stickiness: 0.1 });
+    explicit.estimate(midi, { expected: { string: 0, fret: 5 } }, 1000);
+    const b = explicit.estimate(
+      midi,
+      { stringHint: { string: 1, confidence: 0.55 }, pitchConfidence: 1 },
+      1100,
+    ).best;
+
+    expect(`${a!.string}:${a!.fret}`).toBe(`${b!.string}:${b!.fret}`);
+  });
+});
+
 describe("hand position — the thing that makes it correct", () => {
   const play = (positions: [number, number][], handFret: number | null) => {
     const estimator = new PositionEstimator(guitar);

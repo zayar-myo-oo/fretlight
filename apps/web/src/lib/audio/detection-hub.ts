@@ -357,7 +357,12 @@ class DetectionHub {
 
     if (committed && this.estimator) {
       if (display.midi !== this.snapshot.activeMidi || position === null) {
-        const result = this.estimator.estimate(display.midi!, this.positionContext, timeMs);
+        // How much to trust the pitch itself, straight from the instrument
+        // gate that just evaluated this frame — a shaky reading should not
+        // be allowed to bounce the highlight off a position it was already
+        // holding confidently.
+        const context: PositionContext = { ...this.positionContext, pitchConfidence: verdict.confidence };
+        const result = this.estimator.estimate(display.midi!, context, timeMs);
         position = result.best;
         candidates = result.candidates;
       }

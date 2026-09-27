@@ -31,6 +31,13 @@ export function PositionReadout({
     position.string === null ? null : (noteAt(board, position.string, 0)?.name ?? null);
   const uncertain = position.state === "position_uncertain";
 
+  // One confidence number, not two: how sure this is a real note (the
+  // instrument gate) and how sure this is the right string/fret (the
+  // position estimator's own score) are different questions, but a player
+  // only needs the answer to "can I trust what's on screen?" — which is only
+  // as strong as its weaker half.
+  const overallConfidence = position.string !== null ? Math.min(pitch.confidence, position.confidence) : pitch.confidence;
+
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-6", className)}>
       {/* Pitch identity */}
@@ -76,7 +83,7 @@ export function PositionReadout({
         />
         <Field
           label="Confidence"
-          value={hasNote ? `${Math.round(pitch.confidence * 100)}%` : "—"}
+          value={hasNote ? `${Math.round(overallConfidence * 100)}%` : "—"}
           dim={!hasNote}
         />
       </div>
