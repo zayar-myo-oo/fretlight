@@ -38,6 +38,8 @@ export interface SessionState {
    */
   lowStringOnTop: boolean;
   showOutOfScale: boolean;
+  /** Play a short chime when the tuner reading lands in tune. */
+  tunerChimeEnabled: boolean;
 
   // --- Metronome ---
   bpm: number;
@@ -94,6 +96,7 @@ export const useSession = create<SessionState>()(
       labelMode: "note",
       lowStringOnTop: false,
       showOutOfScale: false,
+      tunerChimeEnabled: true,
 
       bpm: 90,
       timeSignature: { beats: 4, value: 4 },

@@ -1,11 +1,13 @@
 "use client";
 
 import { noteAt } from "@fretlight/core";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { InputSourcePanel } from "@/components/audio/InputSourcePanel";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { NoteReadout } from "@/components/tuner/NoteReadout";
+import { ReferenceStrings } from "@/components/tuner/ReferenceStrings";
 import { IN_TUNE_CENTS, TunerMeter } from "@/components/tuner/TunerMeter";
+import { TuningPicker } from "@/components/tuner/TuningPicker";
 import { Badge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
 import { PositionControl } from "@/components/fretboard/PositionControl";
@@ -13,6 +15,7 @@ import { useAutoListen, useDetection } from "@/hooks/useDetection";
 import { useFretboardContext } from "@/hooks/useFretboard";
 import { useHandPosition } from "@/hooks/useHandPosition";
 import { useMounted } from "@/hooks/useMounted";
+import { useReferenceTone } from "@/hooks/useReferenceTone";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
@@ -24,6 +27,8 @@ export default function TunerPage() {
   const { board } = useFretboardContext();
   const instrumentId = useSession((s) => s.instrumentId);
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
+  const tunerChimeEnabled = useSession((s) => s.tunerChimeEnabled);
+  const patch = useSession((s) => s.patch);
   const { reading, clarity, activeMidi, position, candidates, uiState, instrumentConfidence, rejectReason } =
     useDetection();
 
@@ -77,6 +82,17 @@ export default function TunerPage() {
 
   const inTune = reading !== null && Math.abs(reading.cents) <= IN_TUNE_CENTS;
 
+  // Confirm by ear the moment a string settles in tune — only on the
+  // false→true edge, so a held note doesn't retrigger the chime every frame.
+  const { playInTuneChime } = useReferenceTone();
+  const wasInTune = useRef(false);
+  useEffect(() => {
+    if (inTune && !wasInTune.current && tunerChimeEnabled) {
+      void playInTuneChime();
+    }
+    wasInTune.current = inTune;
+  }, [inTune, tunerChimeEnabled, playInTuneChime]);
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -86,9 +102,20 @@ export default function TunerPage() {
             {board.tuning.name} · {board.tuning.strings.join(" ")}
           </p>
         </div>
-        <Badge tone={inTune ? "correct" : "neutral"}>
-          {inTune ? "in tune" : "±5¢ target"}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={tunerChimeEnabled}
+              onChange={(event) => patch({ tunerChimeEnabled: event.target.checked })}
+              className="h-4 w-4 accent-[var(--color-signal)]"
+            />
+            <span className="text-xs text-[var(--color-ink-dim)]">Chime</span>
+          </label>
+          <Badge tone={inTune ? "correct" : "neutral"}>
+            {inTune ? "in tune" : "±5¢ target"}
+          </Badge>
+        </div>
       </header>
 
       <Panel className={cn("transition-shadow duration-300", inTune && "glow-correct")}>
@@ -101,6 +128,11 @@ export default function TunerPage() {
           />
           <TunerMeter cents={mounted ? (reading?.cents ?? null) : null} className="max-w-2xl" />
 
+          <div className="flex flex-col items-center gap-2">
+            <span className="hud-label">Reference notes · press and hold</span>
+            <ReferenceStrings board={board} />
+          </div>
+
           {nearestString && reading && (
             <p className="text-xs text-[var(--color-ink-faint)]">
               Closest open string:{" "}
@@ -112,6 +144,10 @@ export default function TunerPage() {
             </p>
           )}
         </div>
+      </Panel>
+
+      <Panel title="Instrument & tuning" meta={<span className="hud-label">optional</span>}>
+        <TuningPicker />
       </Panel>
 
       <Panel
