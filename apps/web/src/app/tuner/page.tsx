@@ -29,8 +29,17 @@ export default function TunerPage() {
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
   const tunerChimeEnabled = useSession((s) => s.tunerChimeEnabled);
   const patch = useSession((s) => s.patch);
-  const { reading, clarity, activeMidi, position, candidates, uiState, instrumentConfidence, rejectReason } =
-    useDetection();
+  const {
+    reading,
+    clarity,
+    activeMidi,
+    position,
+    candidates,
+    uiState,
+    instrumentConfidence,
+    rejectReason,
+    noteEventId,
+  } = useDetection();
 
   // The position estimator needs to know which neck it is reasoning about.
   useEffect(() => {
@@ -166,6 +175,7 @@ export default function TunerPage() {
         <Fretboard
           board={board}
           markers={markers}
+          activeEventId={noteEventId}
           {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
           lowStringOnTop={lowStringOnTop}
           onSelect={(position) => detectionHub.mock?.pluck(position.midi)}

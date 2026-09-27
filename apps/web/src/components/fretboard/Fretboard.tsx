@@ -37,6 +37,15 @@ export interface FretboardProps {
   readonly handWindow?: { readonly from: number; readonly to: number } | null;
   readonly className?: string;
   readonly geometry?: GeometryOptions;
+  /**
+   * Increment this once per newly-committed note (detectionHub's
+   * `noteEventId`) so the emphasised marker's pop-and-glow re-triggers on a
+   * repeated note. Without it, playing the same fret twice in a row keys the
+   * marker's `<g>` identically both times, React never remounts it, and the
+   * one-shot entrance animation only ever plays the first time — the neck
+   * would stop visibly reacting to a note the player can hear was replayed.
+   */
+  readonly activeEventId?: number;
 }
 
 /**
@@ -60,6 +69,7 @@ export function Fretboard({
   handWindow,
   className,
   geometry: geometryOptions,
+  activeEventId,
 }: FretboardProps) {
   const lastFret = Math.min(toFret ?? board.fretCount, board.fretCount);
 
@@ -296,9 +306,16 @@ export function Fretboard({
         const radius = marker.emphasis ? 14 : 11.5;
         return (
           <g
-            // Index-qualified: a sequence that revisits a position (an up-and-back
-            // exercise) legitimately yields two markers for one string/fret.
-            key={`marker-${markerIdx}-${marker.string}-${marker.fret}`}
+            // The emphasised marker keys on the event id, not the position, so
+            // a repeated note at the same fret still remounts the element and
+            // replays the pop — otherwise identical string/fret markers are
+            // index-qualified: a sequence that revisits a position (an
+            // up-and-back exercise) legitimately yields two for one fret.
+            key={
+              marker.emphasis && activeEventId !== undefined
+                ? `marker-live-${activeEventId}`
+                : `marker-${markerIdx}-${marker.string}-${marker.fret}`
+            }
             className={marker.emphasis ? "animate-note-pop" : undefined}
             style={marker.emphasis ? { transformOrigin: `${x}px ${y}px` } : undefined}
           >

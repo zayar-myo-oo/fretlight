@@ -57,6 +57,7 @@ export default function LivePage() {
     listening,
     error: audioError,
     starting,
+    noteEventId,
   } = useDetection();
 
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -430,6 +431,7 @@ export default function LivePage() {
         <Fretboard
           board={board}
           markers={mounted ? markers : []}
+          activeEventId={noteEventId}
           lowStringOnTop={lowStringOnTop}
           onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
         />

@@ -420,6 +420,7 @@ export default function PracticePage() {
         <Fretboard
           board={board}
           markers={markers}
+          activeEventId={noteEventId}
           path={sequence.steps
             .map((step) => step.position)
             .filter((position): position is { string: number; fret: number } => position !== undefined)}

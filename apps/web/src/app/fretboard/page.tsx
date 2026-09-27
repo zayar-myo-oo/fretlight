@@ -12,6 +12,7 @@ import {
   getScalePositions,
   getScaleShapes,
   intervalName,
+  mod,
 } from "@fretlight/core";
 import { useEffect, useMemo, useState } from "react";
 import { InputBar } from "@/components/audio/InputBar";
@@ -52,7 +53,7 @@ export default function FretboardPage() {
   const [cameraOn, setCameraOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [shapeIndex, setShapeIndex] = useState<number | "all">("all");
-  const { position } = useDetection();
+  const { position, noteEventId } = useDetection();
   const instrumentId = useSession((s) => s.instrumentId);
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
   const patch = useSession((s) => s.patch);
@@ -138,11 +139,15 @@ export default function FretboardPage() {
   const withLive = useMemo<FretMarker[]>(() => {
     if (!position) return markers;
     const key = `${position.string}:${position.fret}`;
+    // The interval of what was actually played against the current root —
+    // "show interval when available", right on the note that just sounded,
+    // not only on the static scale/chord diagram underneath it.
+    const interval = intervalName(mod(position.midi - root, 12)).slice(0, 3);
     return [
       ...markers.filter((marker) => `${marker.string}:${marker.fret}` !== key),
-      { string: position.string, fret: position.fret, label: "", tone: "live", emphasis: true },
+      { string: position.string, fret: position.fret, label: interval, tone: "live", emphasis: true },
     ];
-  }, [markers, position]);
+  }, [markers, position, root]);
 
   const path = selectedShape?.positions.map((p) => ({ string: p.string, fret: p.fret }));
 
@@ -269,6 +274,7 @@ export default function FretboardPage() {
         <Fretboard
           board={board}
           markers={mounted ? withLive : markers}
+          activeEventId={noteEventId}
           {...(path ? { path } : {})}
           {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
           lowStringOnTop={lowStringOnTop}
