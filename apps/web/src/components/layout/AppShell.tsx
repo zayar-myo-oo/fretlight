@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { getInstrument, getTuning } from "@fretlight/core";
+import { getInstrument } from "@fretlight/core";
 import { useSession } from "@/store/session";
 import { useDetection } from "@/hooks/useDetection";
 import { useMounted } from "@/hooks/useMounted";
+import { resolveTuning } from "@/lib/tuning/resolve-tuning";
 import { cn } from "@/lib/ui/cn";
 import { NAV_ITEMS } from "./nav";
 
@@ -92,10 +93,11 @@ function RailLink({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: 
 function TopBar() {
   const instrumentId = useSession((s) => s.instrumentId);
   const tuningId = useSession((s) => s.tuningId);
+  const customTunings = useSession((s) => s.customTunings);
   const mounted = useMounted();
 
   const instrument = getInstrument(instrumentId);
-  const tuning = getTuning(tuningId);
+  const tuning = resolveTuning(instrumentId, tuningId, customTunings);
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] bg-[rgba(4,6,11,0.72)] px-4 py-3 backdrop-blur-xl md:px-8">

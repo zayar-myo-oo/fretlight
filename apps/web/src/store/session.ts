@@ -5,6 +5,7 @@ import {
   type ScaleId,
   type Subdivision,
   type TimeSignature,
+  CUSTOM_TUNING_ID,
   defaultTuning,
   getInstrument,
   getTuning,
@@ -19,6 +20,13 @@ export interface SessionState {
   instrumentId: string;
   tuningId: string;
   fretCount: number;
+  /**
+   * Per-string notes for the "Custom" tuning, keyed by instrument id so
+   * switching between guitar and bass doesn't clobber either one's custom
+   * set. Only instruments the player has actually edited have an entry —
+   * everything else falls back to that instrument's standard tuning.
+   */
+  customTunings: Readonly<Record<string, readonly string[]>>;
   /** Reference pitch. Some players tune to 442; orchestras drift further. */
   a4: number;
 
@@ -63,6 +71,7 @@ export interface SessionState {
 
   setInstrument: (instrumentId: string) => void;
   setTuning: (tuningId: string) => void;
+  setCustomTuningString: (instrumentId: string, index: number, note: string) => void;
   setRoot: (root: number) => void;
   setScale: (scaleId: ScaleId) => void;
   setChord: (chordId: ChordId) => void;
@@ -88,6 +97,7 @@ export const useSession = create<SessionState>()(
       tuningId: "bass-4-standard",
       fretCount: 20,
       a4: 440,
+      customTunings: {},
 
       root: 9, // A
       scaleId: "minor_pentatonic",
@@ -121,7 +131,17 @@ export const useSession = create<SessionState>()(
           };
         }),
 
-      setTuning: (tuningId) => set(() => (getTuning(tuningId) ? { tuningId } : {})),
+      setTuning: (tuningId) =>
+        set(() => (tuningId === CUSTOM_TUNING_ID || getTuning(tuningId) ? { tuningId } : {})),
+      setCustomTuningString: (instrumentId, index, note) =>
+        set((state) => {
+          const instrument = getInstrument(instrumentId);
+          if (!instrument || index < 0 || index >= instrument.stringCount) return {};
+          const base = state.customTunings[instrumentId] ?? defaultTuning(instrument.kind, instrument.stringCount).strings;
+          const strings = [...base];
+          strings[index] = note;
+          return { customTunings: { ...state.customTunings, [instrumentId]: strings } };
+        }),
       setRoot: (root) => set({ root: ((root % 12) + 12) % 12 }),
       setScale: (scaleId) => set({ scaleId }),
       setChord: (chordId) => set({ chordId }),

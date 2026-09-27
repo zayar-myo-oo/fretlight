@@ -10,3 +10,4 @@ coverage
 .next-dev
 .idea
 .vercel
+.claude/scheduled_tasks.lock

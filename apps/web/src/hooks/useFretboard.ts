@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  type Chord,
-  type Fretboard,
-  type Scale,
-  createFretboard,
-  getChord,
-  getInstrument,
-  getScale,
-  getTuning,
-} from "@fretlight/core";
+import { type Chord, type Fretboard, type Scale, createFretboard, getChord, getInstrument, getScale } from "@fretlight/core";
 import { useMemo } from "react";
+import { resolveTuning } from "@/lib/tuning/resolve-tuning";
 import { useSession } from "@/store/session";
 
 export interface FretboardContext {
@@ -35,15 +27,11 @@ export function useFretboardContext(): FretboardContext {
   const root = useSession((s) => s.root);
   const scaleId = useSession((s) => s.scaleId);
   const chordId = useSession((s) => s.chordId);
+  const customTunings = useSession((s) => s.customTunings);
 
   return useMemo(() => {
     const instrument = getInstrument(instrumentId) ?? getInstrument("bass-4")!;
-    // Fall back to the instrument's standard tuning if a persisted tuning id no
-    // longer matches the selected instrument (e.g. after switching guitar→bass).
-    const tuning =
-      getTuning(tuningId)?.stringCount === instrument.stringCount
-        ? getTuning(tuningId)!
-        : getTuning(instrument.kind === "bass" ? `bass-${instrument.stringCount}-standard` : "guitar-6-standard")!;
+    const tuning = resolveTuning(instrumentId, tuningId, customTunings);
 
     return {
       board: createFretboard(tuning, fretCount),
@@ -52,5 +40,5 @@ export function useFretboardContext(): FretboardContext {
       instrumentName: instrument.name,
       instrumentKind: instrument.kind,
     };
-  }, [instrumentId, tuningId, fretCount, root, scaleId, chordId]);
+  }, [instrumentId, tuningId, fretCount, root, scaleId, chordId, customTunings]);
 }
