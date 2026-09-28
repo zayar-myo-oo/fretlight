@@ -179,7 +179,7 @@ const quality = (partial: Partial<FrameQuality> = {}): FrameQuality => ({
 describe("InstrumentGate", () => {
   it("accepts a steady, tonal, periodic note", () => {
     const gate = new InstrumentGate();
-    let verdict = gate.evaluate(estimate(110), quality());
+    let verdict = gate.evaluate(estimate(110), quality({ onset: true }));
     for (let i = 0; i < 6; i++) verdict = gate.evaluate(estimate(110), quality());
     expect(verdict.accepted).toBe(true);
     expect(verdict.confidence).toBeGreaterThan(0.6);
@@ -189,15 +189,25 @@ describe("InstrumentGate", () => {
   it("rejects a pitch that keeps sliding — the signature of speech", () => {
     const gate = new InstrumentGate();
     // A spoken vowel glides tens of cents within a syllable. Periodicity and
-    // spectrum can look fine; the movement is what gives it away.
+    // spectrum can look fine; the movement is what gives it away. It still
+    // gets an onset, the way starting to talk does — the glide is what has to
+    // catch it, not the onset gate.
     const glide = [110, 118, 126, 119, 131, 124, 136];
-    let verdict = gate.evaluate(estimate(glide[0]!), quality({ flatness: 0.28 }));
+    let verdict = gate.evaluate(estimate(glide[0]!), quality({ flatness: 0.28, onset: true }));
     for (const frequency of glide.slice(1)) {
       verdict = gate.evaluate(estimate(frequency), quality({ flatness: 0.28 }));
     }
     expect(verdict.pitchStability).toBeLessThan(0.4);
     expect(verdict.accepted).toBe(false);
     expect(verdict.reason).toBe("unstable_pitch");
+  });
+
+  it("rejects a steady tone that never had an onset — a sustained voice or hum", () => {
+    const gate = new InstrumentGate();
+    let verdict = gate.evaluate(estimate(110), quality());
+    for (let i = 0; i < 20; i++) verdict = gate.evaluate(estimate(110), quality());
+    expect(verdict.accepted).toBe(false);
+    expect(verdict.reason).toBe("no_onset");
   });
 
   it("rejects noise-like signals outright", () => {
@@ -217,7 +227,8 @@ describe("InstrumentGate", () => {
   it("uses hysteresis so a marginal signal does not flicker", () => {
     const gate = new InstrumentGate({ activateConfidence: 0.6, releaseConfidence: 0.3 });
     // Establish a solid note first.
-    for (let i = 0; i < 6; i++) gate.evaluate(estimate(110), quality());
+    gate.evaluate(estimate(110), quality({ onset: true }));
+    for (let i = 0; i < 5; i++) gate.evaluate(estimate(110), quality());
     expect(gate.isAccepting).toBe(true);
 
     // Degrade to a level that would never have started a note, but is above the
@@ -230,7 +241,8 @@ describe("InstrumentGate", () => {
 
   it("clears its state on silence", () => {
     const gate = new InstrumentGate();
-    for (let i = 0; i < 6; i++) gate.evaluate(estimate(110), quality());
+    gate.evaluate(estimate(110), quality({ onset: true }));
+    for (let i = 0; i < 5; i++) gate.evaluate(estimate(110), quality());
     const verdict = gate.evaluate(estimate(null), quality({ rms: 0 }));
     expect(verdict.accepted).toBe(false);
     expect(verdict.reason).toBe("silent");

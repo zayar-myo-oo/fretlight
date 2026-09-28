@@ -7,6 +7,7 @@ export type RejectReason =
   | "aperiodic"
   | "noise_like"
   | "unstable_pitch"
+  | "no_onset"
   | "below_gate";
 
 export interface GateVerdict {
@@ -33,6 +34,8 @@ export interface InstrumentGateOptions {
   readonly activateConfidence?: number;
   /** Confidence needed to keep accepting once started. Lower than activate. */
   readonly releaseConfidence?: number;
+  /** Frames since an onset within which a fresh note may still activate. */
+  readonly onsetGraceFrames?: number;
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -55,6 +58,16 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
  * Accept and release use different thresholds. With one threshold, a signal
  * hovering near it flickers the UI on and off several times a second, which is
  * the specific failure this class exists to prevent.
+ *
+ * None of the above actually stops a sustained, steady voice from being
+ * accepted, though: a held vowel can be just as periodic, tonal and stable as
+ * a fretted string. What a voice essentially never does is *begin* the way a
+ * pluck does — with a sharp energy transient. So a fresh acceptance (nothing
+ * already ringing) additionally requires a recent onset from the energy-based
+ * detector upstream. Once a note is already accepted, its sustain, bend or
+ * vibrato needs no further onset — only starting a *new* one from silence
+ * does, which is exactly the moment a steady background voice tries to sneak
+ * in as if it were a note being played.
  */
 export class InstrumentGate {
   private readonly minClarity: number;
@@ -64,9 +77,11 @@ export class InstrumentGate {
   private readonly stabilityWindow: number;
   private readonly activateConfidence: number;
   private readonly releaseConfidence: number;
+  private readonly onsetGraceFrames: number;
 
   private history: number[] = [];
   private accepting = false;
+  private framesSinceOnset = Number.MAX_SAFE_INTEGER;
 
   constructor(options: InstrumentGateOptions = {}) {
     this.minClarity = options.minClarity ?? 0.80;
@@ -76,12 +91,14 @@ export class InstrumentGate {
     this.stabilityWindow = options.stabilityWindow ?? 6;
     this.activateConfidence = options.activateConfidence ?? 0.60;
     this.releaseConfidence = options.releaseConfidence ?? 0.34;
+    this.onsetGraceFrames = options.onsetGraceFrames ?? 15;
   }
 
   evaluate(estimate: PitchEstimate, quality: FrameQuality): GateVerdict {
     if (estimate.silent || estimate.frequency === null) {
       this.history = [];
       this.accepting = false;
+      this.framesSinceOnset = Number.MAX_SAFE_INTEGER;
       return { accepted: false, confidence: 0, reason: "silent", pitchStability: 0 };
     }
 
@@ -89,6 +106,12 @@ export class InstrumentGate {
     if (this.history.length > this.stabilityWindow) this.history.shift();
 
     const pitchStability = this.measureStability();
+
+    if (quality.onset) {
+      this.framesSinceOnset = 0;
+    } else if (this.framesSinceOnset < Number.MAX_SAFE_INTEGER) {
+      this.framesSinceOnset++;
+    }
 
     // Hard rejections — no amount of the other terms should rescue these.
     if (quality.clarity < this.minClarity * 0.75) {
@@ -98,6 +121,9 @@ export class InstrumentGate {
     if (quality.zeroCrossingRate > this.maxZeroCrossingRate * 1.5) {
       this.accepting = false;
       return { accepted: false, confidence: 0, reason: "noise_like", pitchStability };
+    }
+    if (!this.accepting && this.framesSinceOnset > this.onsetGraceFrames) {
+      return { accepted: false, confidence: 0, reason: "no_onset", pitchStability };
     }
 
     const clarityScore = clamp01((quality.clarity - this.minClarity) / (1 - this.minClarity));
@@ -155,5 +181,6 @@ export class InstrumentGate {
   reset(): void {
     this.history = [];
     this.accepting = false;
+    this.framesSinceOnset = Number.MAX_SAFE_INTEGER;
   }
 }

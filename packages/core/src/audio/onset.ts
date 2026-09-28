@@ -39,7 +39,12 @@ export class OnsetDetector {
     this.adaptationRate = options.adaptationRate ?? 0.15;
     this.riseFactor = options.riseFactor ?? 1.6;
     this.refractoryFrames = options.refractoryFrames ?? 4;
-    this.floor = options.floor ?? 0.01;
+    // Low, not zero: this only needs to rule out tracking a "rise" out of pure
+    // digital-noise-level fluctuation. The caller already runs this past its
+    // own adaptive noise-floor gate before an onset is ever asked for, so a
+    // softly played note that legitimately clears that gate must not be
+    // rejected a second time here for being quiet.
+    this.floor = options.floor ?? 0.003;
   }
 
   push(rms: number): OnsetResult {

@@ -141,6 +141,8 @@ function rejectMessage(reason: RejectReason): string {
       return "Signal is too noisy to read";
     case "aperiodic":
       return "No clear pitch in the signal";
+    case "no_onset":
+      return "Waiting for a pluck — talking or humming won't register";
     case "below_gate":
       return "Not confident this is the instrument";
     default:

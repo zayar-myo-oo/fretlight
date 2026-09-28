@@ -25,6 +25,26 @@ interface ChainResult {
 }
 
 /**
+ * A little quiet room tone before whatever the test wants to analyse — never
+ * digital silence, which would leave the onset detector's baseline at exactly
+ * zero and unable to register a rise at all. This is what a real microphone
+ * always has ahead of the first note: without it, a signal that is already at
+ * full amplitude on sample 0 looks like it was always there, and the onset
+ * gate (rightly) never lets it in.
+ */
+function withRoomTone(signal: Float32Array, sampleRate: number, seed = 41): Float32Array {
+  const lead = Math.round(sampleRate * 0.2);
+  const buffer = new Float32Array(lead + signal.length);
+  let a = seed;
+  for (let i = 0; i < lead; i++) {
+    a = (a * 1103515245 + 12345) & 0x7fffffff;
+    buffer[i] = ((a / 0x7fffffff) * 2 - 1) * 0.001;
+  }
+  buffer.set(signal, lead);
+  return buffer;
+}
+
+/**
  * Runs the complete production chain over a signal:
  * pipeline → instrument gate → stabiliser → display state machine.
  *
@@ -32,7 +52,8 @@ interface ChainResult {
  * matters — "does talking near the microphone put notes on screen?" — because
  * the answer depends on how the stages compose.
  */
-function runChain(signal: Float32Array, instrumentId: string): ChainResult {
+function runChain(rawSignal: Float32Array, instrumentId: string): ChainResult {
+  const signal = withRoomTone(rawSignal, SAMPLE_RATE);
   const profile = getInstrument(instrumentId)!;
   const pipeline = new PitchPipeline({
     sampleRate: SAMPLE_RATE,
