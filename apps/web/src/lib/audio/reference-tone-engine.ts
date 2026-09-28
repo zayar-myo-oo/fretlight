@@ -1,8 +1,7 @@
 import { midiToFrequency } from "@fretlight/core";
 
 /**
- * Plays reference pitches (tune-by-ear against the target note) and a short
- * "in tune" confirmation chime.
+ * Plays reference pitches to tune by ear against the target note.
  *
  * Follows the same lifecycle as MetronomeEngine: one lazily-created
  * AudioContext kept alive for the component's lifetime rather than recreated
@@ -56,28 +55,6 @@ export class ReferenceToneEngine {
     active.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
     active.oscillator.stop(now + 0.1);
     this.active = null;
-  }
-
-  /** Short two-note chime confirming a string just landed in tune. */
-  async playInTuneChime(): Promise<void> {
-    const context = await this.ensureContext();
-    const master = this.master!;
-    const now = context.currentTime;
-    // A clean fifth an octave above any playable string, so it never gets
-    // mistaken for the note being tuned.
-    [1318.5, 1975.5].forEach((frequency, index) => {
-      const start = now + index * 0.07;
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(this.volume * 0.5, start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
-      oscillator.connect(gain).connect(master);
-      oscillator.start(start);
-      oscillator.stop(start + 0.24);
-    });
   }
 
   private async ensureContext(): Promise<AudioContext> {

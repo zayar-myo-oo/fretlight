@@ -8,7 +8,6 @@ export interface ReferenceToneController {
   /** Sounds the target pitch for `midi` so you can tune by ear against it. */
   playString: (midi: number) => Promise<void>;
   stop: () => void;
-  playInTuneChime: () => Promise<void>;
 }
 
 /**
@@ -43,9 +42,5 @@ export function useReferenceTone(): ReferenceToneController {
     engineRef.current?.stop();
   }, []);
 
-  const playInTuneChime = useCallback(async () => {
-    await engineRef.current?.playInTuneChime();
-  }, []);
-
-  return { playString, stop, playInTuneChime };
+  return { playString, stop };
 }

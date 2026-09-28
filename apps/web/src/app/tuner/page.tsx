@@ -15,7 +15,7 @@ import { useAutoListen, useDetection } from "@/hooks/useDetection";
 import { useFretboardContext } from "@/hooks/useFretboard";
 import { useHandPosition } from "@/hooks/useHandPosition";
 import { useMounted } from "@/hooks/useMounted";
-import { useReferenceTone } from "@/hooks/useReferenceTone";
+import { useTunerChime } from "@/hooks/useTunerChime";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
@@ -91,16 +91,24 @@ export default function TunerPage() {
 
   const inTune = reading !== null && Math.abs(reading.cents) <= IN_TUNE_CENTS;
 
-  // Confirm by ear the moment a string settles in tune — only on the
-  // false→true edge, so a held note doesn't retrigger the chime every frame.
-  const { playInTuneChime } = useReferenceTone();
-  const wasInTune = useRef(false);
+  // Confirm by ear once per genuinely new pluck of the string — keyed on
+  // noteEventId (detectionHub's "one commit, however many frames it took"
+  // counter, the same one useNoteEvent and the practice engine key off of)
+  // rather than a raw cents-threshold crossing. A held note's cents reading
+  // drifts around the ±5¢ line during its decay tail, which would otherwise
+  // register as several rapid "confirmations" from a single pluck and
+  // escalate straight to the loudest clip on its own. Repeating the same
+  // already-in-tune string escalates the clip (see useTunerChime); it resets
+  // the moment a different string is confirmed.
+  const { notifyInTune } = useTunerChime();
+  const lastCheckedEventId = useRef(0);
   useEffect(() => {
-    if (inTune && !wasInTune.current && tunerChimeEnabled) {
-      void playInTuneChime();
+    if (noteEventId === 0 || noteEventId === lastCheckedEventId.current) return;
+    lastCheckedEventId.current = noteEventId;
+    if (inTune && tunerChimeEnabled && reading) {
+      notifyInTune(reading.note.midi);
     }
-    wasInTune.current = inTune;
-  }, [inTune, tunerChimeEnabled, playInTuneChime]);
+  }, [noteEventId, inTune, tunerChimeEnabled, reading, notifyInTune]);
 
   return (
     <div className="flex flex-col gap-6">
