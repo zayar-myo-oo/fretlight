@@ -52,6 +52,7 @@ export * from "./practice/drills";
 // Song / backing-track architecture
 export * from "./song/types";
 export * from "./song/phrase";
+export * from "./song/library";
 
 // Vision
 export * from "./vision/homography";

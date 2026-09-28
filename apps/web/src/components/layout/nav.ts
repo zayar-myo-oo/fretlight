@@ -43,4 +43,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     hint: "Guided scale trainer",
     icon: "M5 12a7 7 0 1 0 14 0 7 7 0 0 0-14 0Zm7-4v4l3 2",
   },
+  {
+    href: "/song",
+    label: "Song",
+    hint: "Learn a piece phrase by phrase",
+    icon: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  },
 ];
