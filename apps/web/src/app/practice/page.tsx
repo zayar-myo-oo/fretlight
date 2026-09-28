@@ -37,6 +37,7 @@ import { useKeyboard } from "@/hooks/useKeyboard";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import { useProgress } from "@/store/progress";
 import { useSession } from "@/store/session";
 import { useWeakAreas } from "@/store/weak-areas";
@@ -520,7 +521,10 @@ export default function PracticePage() {
             .map((step) => step.position)
             .filter((position): position is { string: number; fret: number } => position !== undefined)}
           lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
       </Panel>
 

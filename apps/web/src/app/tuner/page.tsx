@@ -17,6 +17,7 @@ import { useHandPosition } from "@/hooks/useHandPosition";
 import { useMounted } from "@/hooks/useMounted";
 import { useTunerChime } from "@/hooks/useTunerChime";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
 
@@ -186,7 +187,10 @@ export default function TunerPage() {
           activeEventId={noteEventId}
           {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
           lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
         <p className="mt-3 text-xs leading-relaxed text-[var(--color-ink-faint)]">
           The bright marker is where the note was most likely played, chosen from the

@@ -21,6 +21,7 @@ import { useDetection } from "@/hooks/useDetection";
 import { useFretboardContext } from "@/hooks/useFretboard";
 import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import {
   CameraPermissionError,
   listVideoInputs,
@@ -484,7 +485,10 @@ export default function LivePage() {
           markers={mounted ? markers : []}
           activeEventId={noteEventId}
           lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
       </Panel>
     </div>

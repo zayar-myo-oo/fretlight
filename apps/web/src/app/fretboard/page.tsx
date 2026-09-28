@@ -32,6 +32,7 @@ import { useFretboardContext } from "@/hooks/useFretboard";
 import { useHandPosition } from "@/hooks/useHandPosition";
 import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
 
@@ -279,7 +280,10 @@ export default function FretboardPage() {
           {...(path ? { path } : {})}
           {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
           lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
         <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-[var(--color-ink-faint)]">
           <Legend tone="root" label="Root" />
