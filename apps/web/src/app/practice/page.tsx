@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type AccuracyBreakdown,
   type Drill,
   PracticeEngine,
   describeTarget,
@@ -82,6 +83,13 @@ export default function PracticePage() {
    * to the sequence exercises below it.
    */
   const [timed, setTimed] = useState(false);
+  /** Repeat the whole exercise back-to-back instead of stopping at the end. */
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [loopTarget, setLoopTarget] = useState(3);
+  const [attemptNumber, setAttemptNumber] = useState(1);
+  /** This attempt's overall score, one entry per completed pass — the
+   *  measurable improvement curve the loop exists to show. */
+  const [attempts, setAttempts] = useState<number[]>([]);
 
   const [running, setRunning] = useState(false);
   const [index, setIndex] = useState(0);
@@ -98,9 +106,13 @@ export default function PracticePage() {
 
   const engineRef = useRef<PracticeEngine | null>(null);
   const startedAtRef = useRef(0);
-  /** Wall-clock start, kept separate from `startedAtRef` — that one may hold an
-   *  AudioContext-clock instant instead, which a wall-clock duration must not mix with. */
-  const wallStartRef = useRef(0);
+  /** Wall-clock start of the *current attempt* — reset every loop pass, so a
+   *  recorded attempt's duration is its own, not the whole loop's running total. */
+  const attemptStartRef = useRef(0);
+  /** Mirrors `attemptNumber` for the noteEventId effect, which closes over
+   *  whatever render last recreated it — a ref avoids grading the wrong
+   *  attempt count if two notes land in the same tick. */
+  const attemptNumberRef = useRef(1);
 
   const shapes = useMemo(() => getScaleShapes(board, scale, { startFret: 1 }), [board, scale]);
 
@@ -167,16 +179,14 @@ export default function PracticePage() {
     setTendency(null);
     setStreak(0);
     setReactions([]);
+    setAttempts([]);
+    setAttemptNumber(1);
+    attemptNumberRef.current = 1;
   }, [sequence, matchOctave, requirePosition]);
 
-  const stop = useCallback(
-    (completed: boolean) => {
-      const engine = engineRef.current;
-      setRunning(false);
-      if (!engine) return;
-      engine.stop();
-
-      const result = engine.summary;
+  /** Persist one completed (or abandoned-but-mostly-right) pass to the progress history. */
+  const recordAttempt = useCallback(
+    (result: AccuracyBreakdown, completed: boolean) => {
       // Only record a run the player actually got through — a two-note false
       // start would otherwise pollute the accuracy history.
       if (completed || result.correct >= Math.max(4, sequence.steps.length / 2)) {
@@ -184,10 +194,7 @@ export default function PracticePage() {
           exercise: sequence.name,
           instrumentId,
           bpm,
-          // Always the wall clock, regardless of whether grading ran on it or
-          // on the metronome's AudioContext clock — a run's duration is what
-          // the player experienced, not what the exercise was graded against.
-          durationSeconds: Math.max(1, Math.round(now() - wallStartRef.current)),
+          durationSeconds: Math.max(1, Math.round(now() - attemptStartRef.current)),
           pitchAccuracy: result.pitchAccuracy,
           timingAccuracy: result.timingAccuracy,
           overall: result.overall,
@@ -199,7 +206,19 @@ export default function PracticePage() {
     [addRecord, bpm, instrumentId, sequence],
   );
 
-  const start = useCallback(async () => {
+  const stop = useCallback(
+    (completed: boolean) => {
+      const engine = engineRef.current;
+      setRunning(false);
+      if (!engine) return;
+      engine.stop();
+      recordAttempt(engine.summary, completed);
+    },
+    [recordAttempt],
+  );
+
+  /** One pass through the exercise — a fresh engine, the same sequence, timing set up the same way. */
+  const beginAttempt = useCallback(async () => {
     // A timed run is graded against the metronome's own AudioContext clock,
     // not the wall clock `now()` — grading against a different clock than the
     // one the clicks are scheduled on would drift the two apart over a run.
@@ -207,19 +226,28 @@ export default function PracticePage() {
 
     const engine = new PracticeEngine(sequence, { matchOctave, requirePosition });
     engineRef.current = engine;
-    wallStartRef.current = now();
+    attemptStartRef.current = now();
     startedAtRef.current = timed ? metronome.startedAt() : now();
     engine.start(startedAtRef.current);
-    setRunning(true);
     setIndex(0);
     setVerdicts(new Map());
     setTimings(new Map());
     setLastEvent(null);
+    setFlash(null);
+  }, [sequence, matchOctave, requirePosition, timed, metronome]);
+
+  /** A fresh, manual start — as opposed to the loop silently beginning its next attempt. */
+  const start = useCallback(async () => {
+    setAttempts([]);
+    setAttemptNumber(1);
+    attemptNumberRef.current = 1;
+    await beginAttempt();
+    setRunning(true);
     setSummary({ correct: 0, wrong: 0, pitchAccuracy: 0, timingAccuracy: 1, overall: 0 });
     setTendency(null);
     setStreak(0);
     setReactions([]);
-  }, [sequence, matchOctave, requirePosition, timed, metronome]);
+  }, [beginAttempt]);
 
   /**
    * The feedback loop. A confirmed note goes straight into the engine and the
@@ -277,7 +305,22 @@ export default function PracticePage() {
     if (event.reactionSeconds !== null && event.verdict === "correct") {
       setReactions((previous) => [...previous.slice(-19), event.reactionSeconds!]);
     }
-    if (event.completed) stop(true);
+    if (event.completed) {
+      if (loopEnabled && attemptNumberRef.current < loopTarget) {
+        // Not the last pass: bank this attempt's score and go straight into
+        // the next one rather than stopping — that back-to-back repetition
+        // is the entire point of a loop.
+        const result = engine.summary;
+        recordAttempt(result, true);
+        setAttempts((previous) => [...previous, result.overall]);
+        attemptNumberRef.current += 1;
+        setAttemptNumber(attemptNumberRef.current);
+        void beginAttempt();
+      } else {
+        if (loopEnabled) setAttempts((previous) => [...previous, engine.summary.overall]);
+        stop(true);
+      }
+    }
     // Keyed on noteEventId so replaying the same pitch still counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteEventId]);
@@ -526,6 +569,31 @@ export default function PracticePage() {
               />
               <span className="text-xs text-[var(--color-ink-dim)]">Timed (grade to the click)</span>
             </label>
+            <label className={cn("flex items-center gap-2", running ? "cursor-not-allowed opacity-40" : "cursor-pointer")}>
+              <input
+                type="checkbox"
+                checked={loopEnabled}
+                disabled={running}
+                onChange={(event) => setLoopEnabled(event.target.checked)}
+                className="h-4 w-4 accent-[var(--color-signal)]"
+              />
+              <span className="text-xs text-[var(--color-ink-dim)]">Loop</span>
+            </label>
+            {loopEnabled && (
+              <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
+                ×
+                <select
+                  value={loopTarget}
+                  disabled={running}
+                  onChange={(event) => setLoopTarget(Number(event.target.value))}
+                  className="h-8 rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2 text-xs disabled:opacity-40"
+                >
+                  {[2, 3, 5, 10].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           {drill && (
@@ -578,7 +646,19 @@ export default function PracticePage() {
           </p>
         </Panel>
 
-        <Panel title="This run" meta={<Badge tone={running ? "signal" : "neutral"}>{running ? "live" : "idle"}</Badge>}>
+        <Panel
+          title="This run"
+          meta={
+            <>
+              {loopEnabled && (
+                <Badge tone="neutral">
+                  attempt {attemptNumber}/{loopTarget}
+                </Badge>
+              )}
+              <Badge tone={running ? "signal" : "neutral"}>{running ? "live" : "idle"}</Badge>
+            </>
+          }
+        >
           <div className="grid grid-cols-2 gap-5">
             <Stat label="Correct" value={summary.correct} tone="correct" />
             <Stat label="Wrong" value={summary.wrong} tone={summary.wrong > 0 ? "error" : "default"} />
@@ -616,6 +696,26 @@ export default function PracticePage() {
               </span>{" "}
               by about {Math.abs(tendency.biasBeats).toFixed(2)} beat{Math.abs(tendency.biasBeats) === 1 ? "" : "s"}.
             </p>
+          )}
+          {attempts.length > 0 && (
+            <div className="mt-4">
+              <span className="hud-label mb-2 block">Loop progress</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {attempts.map((overall, attemptIdx) => (
+                  <span
+                    key={attemptIdx}
+                    className={cn(
+                      "readout rounded-lg border px-2 py-1 text-[11px]",
+                      attemptIdx === attempts.length - 1
+                        ? "border-[var(--color-signal)] text-[var(--color-signal)]"
+                        : "border-[var(--color-hairline)] text-[var(--color-ink-faint)]",
+                    )}
+                  >
+                    {attemptIdx + 1} → {Math.round(overall * 100)}%
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
           {lastEvent?.verdict === "wrong" && (
             <p className="mt-4 rounded-xl border border-[rgba(255,84,112,0.3)] bg-[rgba(255,84,112,0.07)] p-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
