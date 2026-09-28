@@ -17,6 +17,7 @@ import {
 } from "@fretlight/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GreyscaleSampler } from "@/lib/vision/camera";
+import { createHandTracker, type HandTrackResult, type HandTracker } from "@/lib/vision/hand-tracking";
 import { NeckTrackingClient } from "@/lib/vision/neck-tracking-client";
 import type { CalibrationCorners, StoredCalibration } from "@/lib/vision/calibration";
 import { cn } from "@/lib/ui/cn";
@@ -51,6 +52,15 @@ export interface CameraStageProps {
   readonly onCalibrationChange: (corners: CalibrationCorners) => void;
   readonly onMotion?: (result: MotionResult, strokesPerMinute: number | null) => void;
   readonly onTracking?: (status: TrackingStatus) => void;
+  /**
+   * Detected hands for this frame, normalised 0..1 the same way `onMotion`'s
+   * centroid is — multiply by `DETECT_W`/`DETECT_H` to land in the same pixel
+   * space `onTracking`'s corners are reported in. Empty when no model is
+   * loaded yet, no hand is in frame, or the device can't run it; callers must
+   * already handle "no hand data" gracefully since that is the common case
+   * before the model finishes loading.
+   */
+  readonly onHands?: (hands: readonly HandTrackResult[]) => void;
   readonly showScaleOverlay?: boolean;
   readonly mirrored?: boolean;
   readonly className?: string;
@@ -95,6 +105,7 @@ export function CameraStage({
   onCalibrationChange,
   onMotion,
   onTracking,
+  onHands,
   showScaleOverlay = true,
   mirrored = false,
   className,
@@ -120,6 +131,8 @@ export function CameraStage({
   onMotionRef.current = onMotion;
   const onTrackingRef = useRef(onTracking);
   onTrackingRef.current = onTracking;
+  const onHandsRef = useRef(onHands);
+  onHandsRef.current = onHands;
   /**
    * Last reported tracking state, so the parent is only notified when something
    * it would actually display has changed. Calling back on every drawn frame
@@ -147,8 +160,25 @@ export function CameraStage({
     let frame = 0;
     let lastDraw = 0;
     let lastMotion = 0;
+    let lastHands = 0;
     const DRAW_INTERVAL = 1000 / 30;
     const MOTION_INTERVAL = 1000 / 12;
+    // Real inference, not a pixel diff — throttled harder so it never competes
+    // with drawing or the audio path for the main thread.
+    const HANDS_INTERVAL = 1000 / 8;
+
+    // Loads in the background; every read of `handTracker` below tolerates it
+    // still being null, which covers both "hasn't finished loading yet" and
+    // "failed to load, never will this session" identically.
+    let handTracker: HandTracker | null = null;
+    let cancelled = false;
+    void createHandTracker().then((tracker) => {
+      if (cancelled) {
+        tracker?.close();
+        return;
+      }
+      handTracker = tracker;
+    });
 
     let sampler: GreyscaleSampler;
     let motion: MotionDetector;
@@ -210,6 +240,18 @@ export function CameraStage({
         tracker.offer(grey, now, sampler.warmth, activity.isWarm ? activityMap : undefined);
       }
 
+      if (handTracker && now - lastHands >= HANDS_INTERVAL) {
+        lastHands = now;
+        // Errors here are almost always a frame the decoder wasn't ready for
+        // yet (e.g. right after the stream starts) — skip this tick rather
+        // than let one bad frame take hand tracking down for the session.
+        try {
+          onHandsRef.current?.(handTracker.detect(video, now));
+        } catch {
+          /* skip this frame */
+        }
+      }
+
       if (now - lastDraw < DRAW_INTERVAL) return;
       lastDraw = now;
 
@@ -222,7 +264,15 @@ export function CameraStage({
       const signature = `${status.state}:${Math.round(status.confidence * 10)}:${status.usingFallback}`;
       if (signature !== reportedRef.current) {
         reportedRef.current = signature;
-        onTrackingRef.current?.(status);
+        // Reported in DETECT_W x DETECT_H space, not the container's on-screen
+        // size — the same space `onMotion`'s centroid and now `onHands`' points
+        // are normalised against (see this file's own doc comment on
+        // `DETECT_W`/`DETECT_H`). A caller building a neck projection from
+        // these corners and unprojecting a motion or hand point onto it needs
+        // both in the same space, or the result is off by whatever the
+        // container happens to be sized to that session — wrong in a way that
+        // never shows up in testing at one fixed window size.
+        onTrackingRef.current?.(tracker.current(DETECT_W, DETECT_H));
       }
 
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -253,10 +303,12 @@ export function CameraStage({
 
     frame = requestAnimationFrame(loop);
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       tracker.stop();
       trackerRef.current = null;
       sampler.dispose();
+      handTracker?.close();
     };
   }, [stream]);
 

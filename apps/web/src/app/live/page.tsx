@@ -10,6 +10,7 @@ import {
 } from "@fretlight/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CameraStage, DETECT_H, DETECT_W, type OverlayMode } from "@/components/vision/CameraStage";
+import type { HandTrackResult } from "@/lib/vision/hand-tracking";
 import { FallbackFretboard } from "@/components/vision/FallbackFretboard";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { Badge } from "@/components/ui/Badge";
@@ -73,6 +74,7 @@ export default function LivePage() {
   const [calibration, setCalibration] = useState<StoredCalibration>(() => defaultCalibration());
   const [motion, setMotion] = useState<{ result: MotionResult; rate: number | null } | null>(null);
   const [tracking, setTracking] = useState<TrackingStatus | null>(null);
+  const [hands, setHands] = useState<readonly HandTrackResult[]>([]);
   // Auto-only. Manual four-corner alignment still exists in CameraStage and can
   // be brought back by passing mode="manual", but it is not the experience the
   // screen is for: the point is to pick the instrument up and have the overlay
@@ -165,36 +167,69 @@ export default function LivePage() {
   /**
    * Camera + audio fusion.
    *
-   * There is no finger-landmark model in this pipeline — only neck-plane
-   * tracking and frame-differencing motion (see `vision/motion.ts`'s own
-   * doc comment on why). So this cannot say "the fingertip is here"; what it
-   * can honestly say is "the scene has been moving around here, and here is
-   * where that projects onto the fretboard we're tracking". That is real
-   * information — a hand doing something is usually the only thing moving
-   * in frame — just coarse, so it is handed to the estimator as a capped,
-   * confidence-scaled hint, exactly like the manual "Hand at" control, and
-   * never as a claimed measurement.
+   * Two sources feed this, tried in order:
    *
-   * Audio-only detection is unaffected when the camera is off, tracking is
-   * lost, or the scene is still: the context is cleared and the estimator
-   * falls back to its own inferred hand position, same as on every other
-   * page. Nothing here can block a note from being detected.
+   *  1. **Real hand landmarks**, when the MediaPipe model has loaded and a
+   *     hand is in frame. Each detected hand's fingertip average is
+   *     unprojected onto the tracked neck; whichever hand actually lands on
+   *     the neck (the other, if present, is presumably picking or off to the
+   *     side and unprojects to null) wins. This is an actual measurement of
+   *     where fingers are, so it earns a real confidence ceiling rather than
+   *     the coarse one below.
+   *  2. **Frame-differencing motion**, when no hand model is available yet,
+   *     none loaded successfully, or no hand unprojects onto the neck this
+   *     frame. This cannot say "the fingertip is here", only "the scene has
+   *     been moving around here" — real information, since a hand doing
+   *     something is usually the only thing moving in frame, but coarse, so
+   *     it is capped well below what hand evidence earns.
+   *
+   * Both are handed to the estimator exactly like the manual "Hand at"
+   * control — a confidence-scaled hint, never a claimed measurement it can't
+   * back up. Audio-only detection is unaffected when the camera is off,
+   * tracking is lost, or nothing is moving: the context is cleared and the
+   * estimator falls back to its own inferred hand position, same as on every
+   * other page. Nothing here can block a note from being detected.
    */
   useEffect(() => {
     const corners = tracking?.corners ?? null;
     const trackingConfidence = tracking?.confidence ?? 0;
-    const centroid = motion?.result.active ? motion.result.centroid : null;
-
-    if (!corners || !centroid || trackingConfidence < 0.5) {
+    if (!corners || trackingConfidence < 0.5) {
       detectionHub.setPositionContext({});
       return;
     }
 
     const projection = createNeckProjection(corners, board.fretCount, board.stringCount);
-    const estimate =
-      projection &&
-      unprojectPosition(projection, { x: centroid.x * DETECT_W, y: centroid.y * DETECT_H });
+    if (!projection) {
+      detectionHub.setPositionContext({});
+      return;
+    }
 
+    for (const hand of hands) {
+      const estimate = unprojectPosition(projection, {
+        x: hand.pressPoint.x * DETECT_W,
+        y: hand.pressPoint.y * DETECT_H,
+      });
+      if (!estimate) continue;
+
+      // Real fingertip evidence, scaled by both how sure MediaPipe is this is
+      // a hand and how sure the neck tracker is this is where the neck is —
+      // still short of 1 (the player's own explicit "Hand at" control stays
+      // the most trusted source), but well above what a motion proxy earns.
+      const confidence = Math.min(0.8, hand.confidence * trackingConfidence);
+      detectionHub.setPositionContext({
+        handFret: { fret: estimate.fret, confidence },
+        stringHint: { string: estimate.string, confidence },
+      });
+      return () => detectionHub.setPositionContext({});
+    }
+
+    const centroid = motion?.result.active ? motion.result.centroid : null;
+    if (!centroid) {
+      detectionHub.setPositionContext({});
+      return;
+    }
+
+    const estimate = unprojectPosition(projection, { x: centroid.x * DETECT_W, y: centroid.y * DETECT_H });
     if (!estimate) {
       detectionHub.setPositionContext({});
       return;
@@ -209,7 +244,7 @@ export default function LivePage() {
     });
 
     return () => detectionHub.setPositionContext({});
-  }, [tracking, motion, board]);
+  }, [tracking, motion, hands, board]);
 
   /** Append to the note log on each newly confirmed note. */
   useEffect(() => {
@@ -271,6 +306,11 @@ export default function LivePage() {
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={micLive ? "signal" : "warn"}>{micLive ? "mic live" : "virtual audio"}</Badge>
           <Badge tone={stream ? "signal" : "neutral"}>{stream ? "camera on" : "camera off"}</Badge>
+          {stream && (
+            <Badge tone={hands.length > 0 ? "signal" : "neutral"}>
+              {hands.length > 0 ? `hand tracked · ${hands.length}` : "no hand in frame"}
+            </Badge>
+          )}
         </div>
       </header>
 
@@ -296,6 +336,7 @@ export default function LivePage() {
               onCalibrationChange={updateCorners}
               onMotion={(result, rate) => setMotion({ result, rate })}
               onTracking={setTracking}
+              onHands={setHands}
               showScaleOverlay={showScale}
               mirrored={mirrored}
             />
