@@ -1,7 +1,14 @@
 "use client";
 
-import type { PracticeStep, StepVerdict } from "@fretlight/core";
+import type { PracticeStep, StepVerdict, TimingResult } from "@fretlight/core";
 import { cn } from "@/lib/ui/cn";
+
+const TIMING_LABEL: Record<TimingResult["verdict"], string> = {
+  on_time: "perfect",
+  early: "early",
+  late: "late",
+  missed: "missed",
+};
 
 /**
  * The horizon: what was just played, what to play now, what comes next.
@@ -12,10 +19,13 @@ export function NoteStrip({
   steps,
   index,
   verdicts,
+  timings,
 }: {
   steps: readonly PracticeStep[];
   index: number;
   verdicts: ReadonlyMap<number, StepVerdict>;
+  /** Only passed for a timed run — an untimed one has no expected instant to grade against. */
+  timings?: ReadonlyMap<number, TimingResult>;
 }) {
   const from = Math.max(0, index - 2);
   const window = steps.slice(from, from + 9);
@@ -52,6 +62,20 @@ export function NoteStrip({
               {step.label}
             </span>
             <span className="readout text-[9px] text-[var(--color-ink-faint)]">{step.degree ?? ""}</span>
+            {timings?.get(absolute) && (
+              <span
+                className={cn(
+                  "readout text-[8px] tracking-wide uppercase",
+                  timings.get(absolute)!.verdict === "on_time"
+                    ? "text-[var(--color-correct)]"
+                    : timings.get(absolute)!.verdict === "missed"
+                      ? "text-[var(--color-error)]"
+                      : "text-[var(--color-warn)]",
+                )}
+              >
+                {TIMING_LABEL[timings.get(absolute)!.verdict]}
+              </span>
+            )}
           </div>
         );
       })}

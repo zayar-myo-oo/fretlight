@@ -48,6 +48,18 @@ export class MetronomeEngine {
     return this.context?.currentTime ?? 0;
   }
 
+  /**
+   * The audio-clock instant beat zero actually falls on. A timed practice
+   * exercise must start its own clock here, not at whatever moment
+   * `start()` happened to be called — this already carries the small
+   * scheduling pad `start()` adds so the first click is not clipped, and
+   * grading against anything else would make every note in the run look
+   * systematically early or late by that same fixed offset.
+   */
+  get startedAt(): number {
+    return this.startTime;
+  }
+
   onBeat(listener: (event: ClickEvent) => void): () => void {
     this.beatListeners.add(listener);
     return () => this.beatListeners.delete(listener);

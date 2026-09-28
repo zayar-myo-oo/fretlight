@@ -14,6 +14,8 @@ export interface MetronomeController {
   toggle: () => Promise<void>;
   /** Audio-clock time, shared with practice grading. */
   now: () => number;
+  /** The audio-clock instant beat zero falls on — start a timed exercise's clock here, not at `now()`. */
+  startedAt: () => number;
   onBeat: (listener: (event: ClickEvent) => void) => () => void;
 }
 
@@ -82,10 +84,11 @@ export function useMetronome(): MetronomeController {
   }, [start, stop]);
 
   const now = useCallback(() => engineRef.current?.now() ?? 0, []);
+  const startedAt = useCallback(() => engineRef.current?.startedAt ?? 0, []);
   const onBeat = useCallback(
     (listener: (event: ClickEvent) => void) => engineRef.current?.onBeat(listener) ?? (() => {}),
     [],
   );
 
-  return { isRunning, beat, start, stop, toggle, now, onBeat };
+  return { isRunning, beat, start, stop, toggle, now, startedAt, onBeat };
 }

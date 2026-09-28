@@ -8,6 +8,7 @@ import {
   type EvaluationEvent,
   type StepVerdict,
   type PracticeSequence,
+  type TimingResult,
   formatNote,
   getScaleShapes,
   sequenceFromArpeggio,
@@ -74,18 +75,32 @@ export default function PracticePage() {
   const [drillLength, setDrillLength] = useState(10);
   const [positionIndex, setPositionIndex] = useState(0);
   const [ascendDescend, setAscendDescend] = useState(true);
+  /**
+   * Grade against the metronome's click instead of just waiting for the
+   * player. Drills (note/fret/interval) never carry a bpm-derived timeline —
+   * `generateDrill` always builds them in "free" mode — so this only applies
+   * to the sequence exercises below it.
+   */
+  const [timed, setTimed] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [index, setIndex] = useState(0);
   const [lastEvent, setLastEvent] = useState<EvaluationEvent | null>(null);
   const [verdicts, setVerdicts] = useState<Map<number, StepVerdict>>(new Map());
-  const [summary, setSummary] = useState({ correct: 0, wrong: 0, pitchAccuracy: 0, overall: 0 });
+  const [timings, setTimings] = useState<Map<number, TimingResult>>(new Map());
+  const [summary, setSummary] = useState({ correct: 0, wrong: 0, pitchAccuracy: 0, timingAccuracy: 1, overall: 0 });
+  const [tendency, setTendency] = useState<{ label: "rushing" | "dragging" | "steady"; biasBeats: number } | null>(
+    null,
+  );
   const [flash, setFlash] = useState<"correct" | "wrong" | null>(null);
   const [streak, setStreak] = useState(0);
   const [reactions, setReactions] = useState<number[]>([]);
 
   const engineRef = useRef<PracticeEngine | null>(null);
   const startedAtRef = useRef(0);
+  /** Wall-clock start, kept separate from `startedAtRef` — that one may hold an
+   *  AudioContext-clock instant instead, which a wall-clock duration must not mix with. */
+  const wallStartRef = useRef(0);
 
   const shapes = useMemo(() => getScaleShapes(board, scale, { startFret: 1 }), [board, scale]);
 
@@ -106,6 +121,8 @@ export default function PracticePage() {
     });
   }, [kind, board, drillLength, drillSeed, scale.root]);
 
+  const mode = timed && !drill ? "timed" : "free";
+
   const sequence: PracticeSequence = useMemo(() => {
     if (drill) return drill.sequence;
     if (kind === "position") {
@@ -114,7 +131,7 @@ export default function PracticePage() {
         return sequenceFromShape(
           `${scale.rootName} ${scale.definition.name} · position ${shape.index}`,
           shape.positions,
-          { bpm, ascendDescend },
+          { bpm, ascendDescend, mode },
         );
       }
     }
@@ -122,6 +139,7 @@ export default function PracticePage() {
       return sequenceFromArpeggio(chord.root, chord.definition.id, {
         board,
         bpm,
+        mode,
         startOctave: board.stringCount > 4 || board.openMidi[0]! < 40 ? 1 : 2,
         ...(ascendDescend ? { direction: "up_down" as const } : {}),
       });
@@ -130,9 +148,10 @@ export default function PracticePage() {
       board,
       bpm,
       ascendDescend,
+      mode,
       startOctave: board.openMidi[0]! < 40 ? 1 : 2,
     });
-  }, [drill, kind, shapes, positionIndex, scale, chord, board, bpm, ascendDescend]);
+  }, [drill, kind, shapes, positionIndex, scale, chord, board, bpm, ascendDescend, mode]);
 
   const requirePosition = drill?.requirePosition ?? false;
 
@@ -142,8 +161,10 @@ export default function PracticePage() {
     setRunning(false);
     setIndex(0);
     setVerdicts(new Map());
+    setTimings(new Map());
     setLastEvent(null);
-    setSummary({ correct: 0, wrong: 0, pitchAccuracy: 0, overall: 0 });
+    setSummary({ correct: 0, wrong: 0, pitchAccuracy: 0, timingAccuracy: 1, overall: 0 });
+    setTendency(null);
     setStreak(0);
     setReactions([]);
   }, [sequence, matchOctave, requirePosition]);
@@ -163,7 +184,10 @@ export default function PracticePage() {
           exercise: sequence.name,
           instrumentId,
           bpm,
-          durationSeconds: Math.max(1, Math.round(now() - startedAtRef.current)),
+          // Always the wall clock, regardless of whether grading ran on it or
+          // on the metronome's AudioContext clock — a run's duration is what
+          // the player experienced, not what the exercise was graded against.
+          durationSeconds: Math.max(1, Math.round(now() - wallStartRef.current)),
           pitchAccuracy: result.pitchAccuracy,
           timingAccuracy: result.timingAccuracy,
           overall: result.overall,
@@ -175,19 +199,27 @@ export default function PracticePage() {
     [addRecord, bpm, instrumentId, sequence],
   );
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
+    // A timed run is graded against the metronome's own AudioContext clock,
+    // not the wall clock `now()` — grading against a different clock than the
+    // one the clicks are scheduled on would drift the two apart over a run.
+    if (timed && !metronome.isRunning) await metronome.start();
+
     const engine = new PracticeEngine(sequence, { matchOctave, requirePosition });
     engineRef.current = engine;
-    startedAtRef.current = now();
+    wallStartRef.current = now();
+    startedAtRef.current = timed ? metronome.startedAt() : now();
     engine.start(startedAtRef.current);
     setRunning(true);
     setIndex(0);
     setVerdicts(new Map());
+    setTimings(new Map());
     setLastEvent(null);
-    setSummary({ correct: 0, wrong: 0, pitchAccuracy: 0, overall: 0 });
+    setSummary({ correct: 0, wrong: 0, pitchAccuracy: 0, timingAccuracy: 1, overall: 0 });
+    setTendency(null);
     setStreak(0);
     setReactions([]);
-  }, [sequence, matchOctave, requirePosition]);
+  }, [sequence, matchOctave, requirePosition, timed, metronome]);
 
   /**
    * The feedback loop. A confirmed note goes straight into the engine and the
@@ -200,7 +232,8 @@ export default function PracticePage() {
 
     const event = engine.submitNote({
       midi: activeMidi,
-      time: now(),
+      // Same clock the run was started on — see `start()`.
+      time: timed ? metronome.now() : now(),
       // Fret practice grades *where* it was played, so the estimator's answer
       // is part of the input rather than just a display detail.
       ...(positionState.string !== null && positionState.fret !== null
@@ -217,14 +250,26 @@ export default function PracticePage() {
       next.set(engine.currentIndex - (heldPosition ? 0 : 1), event.verdict);
       return next;
     });
+    if (event.timing) {
+      const timing = event.timing;
+      setTimings((previous) => {
+        const next = new Map(previous);
+        next.set(engine.currentIndex - 1, timing);
+        return next;
+      });
+    }
 
     const engineSummary = engine.summary;
     setSummary({
       correct: engineSummary.correct,
       wrong: engineSummary.wrong,
       pitchAccuracy: engineSummary.pitchAccuracy,
+      timingAccuracy: engineSummary.timingAccuracy,
       overall: engineSummary.overall,
     });
+    if (timed) {
+      setTendency({ label: engine.timing.tendency, biasBeats: engine.timing.bias });
+    }
 
     setFlash(event.verdict === "correct" ? "correct" : event.verdict === "skipped" ? null : "wrong");
     if (event.verdict === "correct") setStreak((value) => value + 1);
@@ -244,8 +289,8 @@ export default function PracticePage() {
   }, [flash]);
 
   useKeyboard({
-    " ": () => (running ? stop(false) : start()),
-    Space: () => (running ? stop(false) : start()),
+    " ": () => (running ? stop(false) : void start()),
+    Space: () => (running ? stop(false) : void start()),
     m: () => void metronome.toggle(),
     s: () => {
       const engine = engineRef.current;
@@ -327,7 +372,7 @@ export default function PracticePage() {
           <Button variant={metronome.isRunning ? "primary" : "secondary"} size="sm" onClick={() => void metronome.toggle()}>
             {metronome.isRunning ? `Click ${bpm}` : "Metronome"}
           </Button>
-          <Button variant={running ? "danger" : "primary"} onClick={() => (running ? stop(false) : start())}>
+          <Button variant={running ? "danger" : "primary"} onClick={() => (running ? stop(false) : void start())}>
             {running ? "Stop" : "Start practice"}
           </Button>
         </div>
@@ -405,7 +450,7 @@ export default function PracticePage() {
         </div>
 
         <div className="mt-6">
-          <NoteStrip steps={sequence.steps} index={index} verdicts={verdicts} />
+          <NoteStrip steps={sequence.steps} index={index} verdicts={verdicts} timings={timed ? timings : undefined} />
         </div>
 
         <div className="mt-5 h-1 overflow-hidden rounded-full bg-[var(--color-hairline)]">
@@ -468,6 +513,19 @@ export default function PracticePage() {
               />
               <span className="text-xs text-[var(--color-ink-dim)]">Exact octave</span>
             </label>
+            <label
+              className={cn("flex items-center gap-2", drill ? "cursor-not-allowed opacity-40" : "cursor-pointer")}
+              title={drill ? "Drills have no beat timeline to grade against — only scale/position/arpeggio runs do." : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={timed && !drill}
+                disabled={!!drill}
+                onChange={(event) => setTimed(event.target.checked)}
+                className="h-4 w-4 accent-[var(--color-signal)]"
+              />
+              <span className="text-xs text-[var(--color-ink-dim)]">Timed (grade to the click)</span>
+            </label>
           </div>
 
           {drill && (
@@ -529,6 +587,15 @@ export default function PracticePage() {
               value={`${Math.round(summary.pitchAccuracy * 100)}%`}
               tone="signal"
             />
+            {/* Only ever means something graded against a click — an untimed
+                run has no expected instants to measure against, and showing
+                a number here regardless would just be the neutral default
+                dressed up as a score. */}
+            <Stat
+              label="Timing accuracy"
+              value={timed ? `${Math.round(summary.timingAccuracy * 100)}%` : "—"}
+              tone="signal"
+            />
             <Stat label="Progress" value={`${index}/${sequence.steps.length}`} />
             <Stat label="Streak" value={streak} tone={streak >= 5 ? "correct" : "default"} />
             <Stat
@@ -541,6 +608,15 @@ export default function PracticePage() {
               unit={reactions.length === 0 ? undefined : "s"}
             />
           </div>
+          {timed && tendency && tendency.label !== "steady" && (
+            <p className="mt-4 text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
+              You tend to{" "}
+              <span className="text-[var(--color-ink-dim)]">
+                {tendency.label === "rushing" ? "rush" : "drag"}
+              </span>{" "}
+              by about {Math.abs(tendency.biasBeats).toFixed(2)} beat{Math.abs(tendency.biasBeats) === 1 ? "" : "s"}.
+            </p>
+          )}
           {lastEvent?.verdict === "wrong" && (
             <p className="mt-4 rounded-xl border border-[rgba(255,84,112,0.3)] bg-[rgba(255,84,112,0.07)] p-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
               Heard <span className="readout">{formatNote(lastEvent.playedMidi)}</span> — the
