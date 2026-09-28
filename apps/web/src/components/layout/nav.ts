@@ -4,6 +4,13 @@ export interface NavItem {
   readonly hint: string;
   /** Inline SVG path data, so navigation costs no extra request and works offline. */
   readonly icon: string;
+  /**
+   * Gets a slot in the phone tab bar itself rather than behind "More".
+   * The desktop rail always shows every item regardless of this flag — it
+   * only exists because a phone-width bottom bar cannot fit eight tabs
+   * without each one shrinking past the point of being tappable.
+   */
+  readonly mobilePrimary?: boolean;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -12,18 +19,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Home",
     hint: "Instrument and session",
     icon: "M4 11.5 12 4l8 7.5M6.5 10v9.5h11V10",
+    mobilePrimary: true,
   },
   {
     href: "/tuner",
     label: "Tuner",
     hint: "Chromatic tuner",
     icon: "M12 3v18M6 8v8M18 8v8M3 11v2M21 11v2",
+    mobilePrimary: true,
   },
   {
     href: "/fretboard",
     label: "Fretboard",
     hint: "Scales, chords, note finder",
     icon: "M3 6h18M3 12h18M3 18h18M8 4v16M14 4v16",
+    mobilePrimary: true,
   },
   {
     href: "/metronome",
@@ -42,6 +52,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Practice",
     hint: "Guided scale trainer",
     icon: "M5 12a7 7 0 1 0 14 0 7 7 0 0 0-14 0Zm7-4v4l3 2",
+    mobilePrimary: true,
   },
   {
     href: "/song",

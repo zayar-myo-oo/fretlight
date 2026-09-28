@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getInstrument } from "@fretlight/core";
 import { useSession } from "@/store/session";
 import { useCalibration } from "@/hooks/useCalibration";
@@ -44,9 +44,65 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      {/* Mobile tab bar */}
+      <MobileTabBar pathname={pathname} />
+    </div>
+  );
+}
+
+/**
+ * Eight destinations do not fit a phone-width bottom bar as flat, equal-width
+ * tabs — each one shrinks past the point of being reliably tappable. So only
+ * `mobilePrimary` items (see nav.ts) get a permanent slot; everything else
+ * sits behind a "More" tab that opens a small sheet above the bar. The
+ * desktop rail is unaffected — it always lists every item.
+ */
+function MobileTabBar({ pathname }: { pathname: string }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const primary = NAV_ITEMS.filter((item) => item.mobilePrimary);
+  const overflow = NAV_ITEMS.filter((item) => !item.mobilePrimary);
+  const overflowActive = overflow.some((item) => isActive(pathname, item.href));
+
+  // Close the sheet on navigation rather than leaving it open over the new page.
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  return (
+    <>
+      {moreOpen && (
+        <>
+          <button
+            aria-label="Close menu"
+            onClick={() => setMoreOpen(false)}
+            className="fixed inset-0 z-40 bg-[rgba(4,6,11,0.6)] backdrop-blur-sm md:hidden"
+          />
+          <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 rounded-2xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.4)] md:hidden">
+            <div className="grid grid-cols-2 gap-1.5">
+              {overflow.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors",
+                      active
+                        ? "bg-[rgba(34,224,214,0.12)] text-[var(--color-signal)]"
+                        : "text-[var(--color-ink-dim)] hover:bg-[rgba(255,255,255,0.04)]",
+                    )}
+                  >
+                    <Icon path={item.icon} />
+                    <span className="text-xs font-medium">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-[var(--color-hairline)] bg-[rgba(8,12,20,0.92)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
-        {NAV_ITEMS.map((item) => {
+        {primary.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -62,8 +118,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           );
         })}
+        <button
+          onClick={() => setMoreOpen((open) => !open)}
+          aria-expanded={moreOpen}
+          aria-label="More"
+          className={cn(
+            "flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors",
+            moreOpen || overflowActive ? "text-[var(--color-signal)]" : "text-[var(--color-ink-faint)]",
+          )}
+        >
+          <Icon path="M5 12h.01M12 12h.01M19 12h.01M5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
+          <span className="text-[9px] tracking-wider uppercase">More</span>
+        </button>
       </nav>
-    </div>
+    </>
   );
 }
 
