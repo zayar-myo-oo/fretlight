@@ -33,6 +33,7 @@ import { useProgress } from "@/store/progress";
 import { useSession } from "@/store/session";
 import { useWeakAreas } from "@/store/weak-areas";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import { cn } from "@/lib/ui/cn";
 
 const now = () => performance.now() / 1000;
@@ -217,6 +218,20 @@ export default function SongPage() {
   const currentStep = sequence.steps[index] ?? null;
   const nextStep = sequence.steps[index + 1] ?? null;
 
+  /**
+   * The song already knows exactly where each note lives on the neck — a real
+   * phrase is not restricted to positions that are unique on the fretboard the
+   * way a fret drill's targets are. Without this hint the position estimator
+   * has to guess among every place the detected pitch could be played, and its
+   * guess is not always the one the phrase actually intends, which shows up as
+   * a wrong-looking highlight for a correctly played note. Position is never
+   * graded on this screen (only pitch is), so telling the estimator the answer
+   * sharpens the display without making anything easier to pass.
+   */
+  useEffect(() => {
+    detectionHub.setPositionContext(running && currentStep?.position ? { expected: currentStep.position } : {});
+  }, [running, currentStep]);
+
   const markers = useMemo<FretMarker[]>(() => {
     const byPosition = new Map<string, FretMarker>();
     const put = (marker: FretMarker) => byPosition.set(`${marker.string}:${marker.fret}`, marker);
@@ -381,7 +396,10 @@ export default function SongPage() {
           markers={markers}
           activeEventId={noteEventId}
           lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
       </Panel>
 

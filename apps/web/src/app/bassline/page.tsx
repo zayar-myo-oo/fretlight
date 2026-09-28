@@ -35,6 +35,7 @@ import { useKeyboard } from "@/hooks/useKeyboard";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { fretSynth } from "@/lib/audio/fret-synth";
 import { useProgress } from "@/store/progress";
 import { useWeakAreas } from "@/store/weak-areas";
 import { cn } from "@/lib/ui/cn";
@@ -219,6 +220,17 @@ export default function BasslinePage() {
   const currentStep = sequence.steps[index] ?? null;
   const nextStep = sequence.steps[index + 1] ?? null;
 
+  /**
+   * Same reasoning as Song: the generated line already fixes exactly which
+   * string and fret each note is, so telling the estimator sharpens the
+   * highlight instead of leaving it to guess among every place the detected
+   * pitch could live. Position is never graded here — only pitch is — so
+   * this changes the display, not what counts as correct.
+   */
+  useEffect(() => {
+    detectionHub.setPositionContext(running && currentStep?.position ? { expected: currentStep.position } : {});
+  }, [running, currentStep]);
+
   const markers = useMemo<FretMarker[]>(() => {
     const byPosition = new Map<string, FretMarker>();
     const put = (marker: FretMarker) => byPosition.set(`${marker.string}:${marker.fret}`, marker);
@@ -391,7 +403,10 @@ export default function BasslinePage() {
           board={board}
           markers={markers}
           activeEventId={noteEventId}
-          onSelect={(position) => detectionHub.mock?.pluck(position.midi)}
+          onSelect={(position) => {
+            detectionHub.mock?.pluck(position.midi);
+            void fretSynth.pluck(position.midi);
+          }}
         />
       </Panel>
 
