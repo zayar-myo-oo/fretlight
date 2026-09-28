@@ -15,6 +15,7 @@ import {
   intervalName,
   mod,
 } from "@fretlight/core";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { InputBar } from "@/components/audio/InputBar";
 import { PositionReadout } from "@/components/fretboard/PositionReadout";
@@ -38,6 +39,21 @@ import { cn } from "@/lib/ui/cn";
 
 type Mode = "scale" | "chord";
 
+// Three.js (~140 kB) has no business being in every /fretboard page load when
+// most sessions never touch the 3D toggle — loaded only once it's asked for,
+// and never on the server, since it needs a real WebGL canvas.
+const Fretboard3D = dynamic(
+  () => import("@/components/fretboard/Fretboard3D").then((m) => m.Fretboard3D),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-[var(--color-hairline)] bg-black/40 text-xs text-[var(--color-ink-faint)]">
+        Loading 3D view…
+      </div>
+    ),
+  },
+);
+
 export default function FretboardPage() {
   const mounted = useMounted();
 
@@ -52,6 +68,7 @@ export default function FretboardPage() {
   const setLabelMode = useSession((s) => s.setLabelMode);
 
   const [mode, setMode] = useState<Mode>("scale");
+  const [view, setView] = useState<"2d" | "3d">("2d");
   const [cameraOn, setCameraOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [shapeIndex, setShapeIndex] = useState<number | "all">("all");
@@ -267,24 +284,48 @@ export default function FretboardPage() {
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <PositionControl fretCount={board.fretCount} />
-          <span className="text-[11px] text-[var(--color-ink-faint)]">
-            {handFret === null
-              ? "Assuming open position — set where your hand is for an exact match"
-              : `Matching notes around fret ${handFret}`}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-[var(--color-ink-faint)]">
+              {handFret === null
+                ? "Assuming open position — set where your hand is for an exact match"
+                : `Matching notes around fret ${handFret}`}
+            </span>
+            <SegmentedControl
+              size="sm"
+              options={[
+                { value: "2d", label: "2D" },
+                { value: "3d", label: "3D" },
+              ]}
+              value={view}
+              onChange={(value) => setView(value as "2d" | "3d")}
+            />
+          </div>
         </div>
-        <Fretboard
-          board={board}
-          markers={mounted ? withLive : markers}
-          activeEventId={noteEventId}
-          {...(path ? { path } : {})}
-          {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
-          lowStringOnTop={lowStringOnTop}
-          onSelect={(position) => {
-            detectionHub.mock?.pluck(position.midi);
-            void fretSynth.pluck(position.midi);
-          }}
-        />
+        {view === "3d" ? (
+          <Fretboard3D
+            board={board}
+            markers={mounted ? withLive : markers}
+            lowStringOnTop={lowStringOnTop}
+            className="h-[420px] w-full overflow-hidden rounded-2xl border border-[var(--color-hairline)] bg-black/40"
+            onSelect={(position) => {
+              detectionHub.mock?.pluck(position.midi);
+              void fretSynth.pluck(position.midi);
+            }}
+          />
+        ) : (
+          <Fretboard
+            board={board}
+            markers={mounted ? withLive : markers}
+            activeEventId={noteEventId}
+            {...(path ? { path } : {})}
+            {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}
+            lowStringOnTop={lowStringOnTop}
+            onSelect={(position) => {
+              detectionHub.mock?.pluck(position.midi);
+              void fretSynth.pluck(position.midi);
+            }}
+          />
+        )}
         <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-[var(--color-ink-faint)]">
           <Legend tone="root" label="Root" />
           <Legend tone={mode === "scale" ? "scale" : "chord"} label={mode === "scale" ? "Scale tone" : "Chord tone"} />
