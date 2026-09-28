@@ -7,6 +7,7 @@ import {
   describeTarget,
   generateDrill,
   type EvaluationEvent,
+  type StepResult,
   type StepVerdict,
   type PracticeSequence,
   type TimingResult,
@@ -38,6 +39,7 @@ import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import { useProgress } from "@/store/progress";
 import { useSession } from "@/store/session";
+import { useWeakAreas } from "@/store/weak-areas";
 import { cn } from "@/lib/ui/cn";
 
 /**
@@ -184,9 +186,11 @@ export default function PracticePage() {
     attemptNumberRef.current = 1;
   }, [sequence, matchOctave, requirePosition]);
 
+  const recordResults = useWeakAreas((s) => s.recordResults);
+
   /** Persist one completed (or abandoned-but-mostly-right) pass to the progress history. */
   const recordAttempt = useCallback(
-    (result: AccuracyBreakdown, completed: boolean) => {
+    (result: AccuracyBreakdown, completed: boolean, history: readonly StepResult[]) => {
       // Only record a run the player actually got through — a two-note false
       // start would otherwise pollute the accuracy history.
       if (completed || result.correct >= Math.max(4, sequence.steps.length / 2)) {
@@ -201,9 +205,12 @@ export default function PracticePage() {
           notesCorrect: result.correct,
           notesTotal: sequence.steps.length,
         });
+        // Weak-note/weak-position analysis needs the per-step detail a
+        // summary throws away — same run, folded into the running tallies.
+        recordResults(history);
       }
     },
-    [addRecord, bpm, instrumentId, sequence],
+    [addRecord, recordResults, bpm, instrumentId, sequence],
   );
 
   const stop = useCallback(
@@ -212,7 +219,7 @@ export default function PracticePage() {
       setRunning(false);
       if (!engine) return;
       engine.stop();
-      recordAttempt(engine.summary, completed);
+      recordAttempt(engine.summary, completed, engine.history);
     },
     [recordAttempt],
   );
@@ -311,7 +318,7 @@ export default function PracticePage() {
         // the next one rather than stopping — that back-to-back repetition
         // is the entire point of a loop.
         const result = engine.summary;
-        recordAttempt(result, true);
+        recordAttempt(result, true, engine.history);
         setAttempts((previous) => [...previous, result.overall]);
         attemptNumberRef.current += 1;
         setAttemptNumber(attemptNumberRef.current);

@@ -16,7 +16,7 @@ import {
   phraseToSequence,
   phrasesForTrack,
 } from "@fretlight/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InputSourcePanel } from "@/components/audio/InputSourcePanel";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { NoteStrip } from "@/components/practice/NoteStrip";
@@ -29,7 +29,9 @@ import { useAutoListen, useDetection, useFretPositionState } from "@/hooks/useDe
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useMounted } from "@/hooks/useMounted";
+import { useProgress } from "@/store/progress";
 import { useSession } from "@/store/session";
+import { useWeakAreas } from "@/store/weak-areas";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import { cn } from "@/lib/ui/cn";
 
@@ -98,6 +100,9 @@ export default function SongPage() {
   }, [board, track.instrumentId]);
 
   const [engine, setEngine] = useState<PracticeEngine | null>(null);
+  const attemptStartRef = useRef(0);
+  const addRecord = useProgress((s) => s.addRecord);
+  const recordResults = useWeakAreas((s) => s.recordResults);
 
   const resetDisplay = useCallback(() => {
     setIndex(0);
@@ -115,16 +120,40 @@ export default function SongPage() {
     resetDisplay();
   }, [sequence, resetDisplay]);
 
-  const stop = useCallback(() => {
-    engine?.stop();
-    setRunning(false);
-  }, [engine]);
+  const stop = useCallback(
+    (completed = false) => {
+      if (engine) {
+        const result = engine.summary;
+        // Same threshold the drill trainer uses: only a run the player
+        // actually got most of the way through pollutes the history less
+        // than a two-note false start would.
+        if (completed || result.correct >= Math.max(2, sequence.steps.length / 2)) {
+          addRecord({
+            exercise: `${track.title} — ${phrase.label}`,
+            instrumentId: track.instrumentId,
+            bpm,
+            durationSeconds: Math.max(1, Math.round(now() - attemptStartRef.current)),
+            pitchAccuracy: result.pitchAccuracy,
+            timingAccuracy: result.timingAccuracy,
+            overall: result.overall,
+            notesCorrect: result.correct,
+            notesTotal: sequence.steps.length,
+          });
+          recordResults(engine.history);
+        }
+      }
+      engine?.stop();
+      setRunning(false);
+    },
+    [engine, addRecord, recordResults, track, phrase, bpm, sequence],
+  );
 
   const start = useCallback(async () => {
     if (timed && !metronome.isRunning) await metronome.start();
     const fresh = new PracticeEngine(sequence);
     setEngine(fresh);
     const startTime = timed ? metronome.startedAt() : now();
+    attemptStartRef.current = now();
     fresh.start(startTime);
     setRunning(true);
     resetDisplay();
@@ -174,7 +203,7 @@ export default function SongPage() {
       overall: result.overall,
     });
     setFlash(event.verdict === "correct" ? "correct" : event.verdict === "skipped" ? null : "wrong");
-    if (event.completed) stop();
+    if (event.completed) stop(true);
     // Keyed on noteEventId so replaying the same pitch still counts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteEventId]);

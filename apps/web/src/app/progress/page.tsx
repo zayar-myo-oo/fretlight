@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARP_NAMES } from "@fretlight/core";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
@@ -7,6 +8,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Stat } from "@/components/ui/Stat";
 import { useMounted } from "@/hooks/useMounted";
 import { type ProgressRange, filterRecordsByRange, summarise, useProgress } from "@/store/progress";
+import { type WeakSpot, useWeakAreas, weakestSpots } from "@/store/weak-areas";
 import { cn } from "@/lib/ui/cn";
 
 const RANGE_LABELS: Record<ProgressRange, string> = {
@@ -29,6 +31,9 @@ export default function ProgressPage() {
   const mounted = useMounted();
   const records = useProgress((s) => s.records);
   const clear = useProgress((s) => s.clear);
+  const weakNotes = useWeakAreas((s) => s.notes);
+  const weakPositions = useWeakAreas((s) => s.positions);
+  const clearWeakAreas = useWeakAreas((s) => s.clear);
   const [range, setRange] = useState<ProgressRange>("week");
 
   const windowed = useMemo(() => filterRecordsByRange(records, range), [records, range]);
@@ -36,6 +41,15 @@ export default function ProgressPage() {
   const streakDays = useMemo(() => summarise(records).streakDays, [records]);
 
   const recent = windowed.slice(0, 15);
+
+  // Weak areas are always all-time — the whole point is spotting a pattern
+  // that a single week's handful of attempts is too little data to show.
+  const weakestNotes = useMemo(() => weakestSpots(weakNotes), [weakNotes]);
+  const weakestPositions = useMemo(() => weakestSpots(weakPositions), [weakPositions]);
+  const recommendation = useMemo(
+    () => buildRecommendation(weakestNotes, weakestPositions),
+    [weakestNotes, weakestPositions],
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,6 +85,52 @@ export default function ProgressPage() {
         )}
       </Panel>
 
+      {(weakestNotes.length > 0 || weakestPositions.length > 0) && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Panel
+            title="Weak notes"
+            meta={<span className="hud-label">{Object.values(weakNotes).reduce((n, t) => n + t.attempts, 0)} attempts tracked</span>}
+          >
+            {weakestNotes.length === 0 ? (
+              <p className="text-sm text-[var(--color-ink-faint)]">
+                Not enough attempts on any single note yet to say.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {weakestNotes.map((spot) => (
+                  <WeakBar key={spot.key} label={SHARP_NAMES[Number(spot.key)]!} spot={spot} />
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          <Panel
+            title="Weak positions"
+            meta={<span className="hud-label">{Object.values(weakPositions).reduce((n, t) => n + t.attempts, 0)} attempts tracked</span>}
+          >
+            {weakestPositions.length === 0 ? (
+              <p className="text-sm text-[var(--color-ink-faint)]">
+                Not enough attempts at any single fret yet to say — this only fills in from
+                exercises with a specific target position (Fret drills, Song, Bassline).
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {weakestPositions.map((spot) => {
+                  const [string, fret] = spot.key.split(":");
+                  return <WeakBar key={spot.key} label={`String ${Number(string) + 1}, fret ${fret}`} spot={spot} />;
+                })}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
+
+      {recommendation && (
+        <Panel title="Recommended next" meta={<Badge tone="signal">from your own data</Badge>}>
+          <p className="text-sm leading-relaxed text-[var(--color-ink-dim)]">{recommendation}</p>
+        </Panel>
+      )}
+
       <Panel title="Recent sessions">
         {!mounted || recent.length === 0 ? (
           <p className="text-sm text-[var(--color-ink-faint)]">Nothing here yet.</p>
@@ -103,10 +163,13 @@ export default function ProgressPage() {
         )}
       </Panel>
 
-      {mounted && records.length > 0 && (
+      {mounted && (records.length > 0 || weakestNotes.length > 0 || weakestPositions.length > 0) && (
         <button
           onClick={() => {
-            if (window.confirm("Clear all locally stored practice history? This cannot be undone.")) clear();
+            if (window.confirm("Clear all locally stored practice history? This cannot be undone.")) {
+              clear();
+              clearWeakAreas();
+            }
           }}
           className="self-start text-[11px] text-[var(--color-ink-faint)] underline decoration-dotted hover:text-[var(--color-error)]"
         >
@@ -115,6 +178,58 @@ export default function ProgressPage() {
       )}
     </div>
   );
+}
+
+function WeakBar({ label, spot }: { label: string; spot: WeakSpot }) {
+  const percent = Math.round(spot.accuracy * 100);
+  return (
+    <div className="flex items-center gap-3">
+      <span className="readout w-16 shrink-0 text-xs font-semibold">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-hairline)]">
+        <div
+          className={cn(
+            "h-full rounded-full",
+            spot.accuracy < 0.5
+              ? "bg-[var(--color-error)]"
+              : spot.accuracy < 0.75
+                ? "bg-[var(--color-warn)]"
+                : "bg-[var(--color-correct)]",
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="readout w-20 shrink-0 text-right text-[11px] text-[var(--color-ink-faint)]">
+        {percent}% · {spot.attempts}×
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A recommendation built only from what `weakestSpots` actually found — no
+ * fixed catalogue of tips, no fallback that fires when there is no real
+ * pattern. If nothing has enough attempts yet, this returns null and the
+ * panel does not render at all rather than showing something generic.
+ */
+function buildRecommendation(notes: readonly WeakSpot[], positions: readonly WeakSpot[]): string | null {
+  const worstNote = notes[0];
+  const worstPosition = positions[0];
+  if (!worstNote && !worstPosition) return null;
+
+  const parts: string[] = [];
+  if (worstNote) {
+    const name = SHARP_NAMES[Number(worstNote.key)];
+    parts.push(
+      `You're landing ${name} correctly only ${Math.round(worstNote.accuracy * 100)}% of the time over ${worstNote.attempts} attempts — a Note drill on ${name} would target it directly.`,
+    );
+  }
+  if (worstPosition) {
+    const [string, fret] = worstPosition.key.split(":");
+    parts.push(
+      `String ${Number(string) + 1}, fret ${fret} is your weakest specific position at ${Math.round(worstPosition.accuracy * 100)}% over ${worstPosition.attempts} attempts — a Fret drill would isolate it.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 function formatDuration(totalMinutes: number): string {

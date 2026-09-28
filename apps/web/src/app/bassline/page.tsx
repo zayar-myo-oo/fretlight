@@ -21,7 +21,7 @@ import {
   phraseToSequence,
   progressionLengthBeats,
 } from "@fretlight/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InputSourcePanel } from "@/components/audio/InputSourcePanel";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { NoteStrip } from "@/components/practice/NoteStrip";
@@ -35,6 +35,8 @@ import { useKeyboard } from "@/hooks/useKeyboard";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useMounted } from "@/hooks/useMounted";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { useProgress } from "@/store/progress";
+import { useWeakAreas } from "@/store/weak-areas";
 import { cn } from "@/lib/ui/cn";
 
 const now = () => performance.now() / 1000;
@@ -109,6 +111,9 @@ export default function BasslinePage() {
   }, [board]);
 
   const [engine, setEngine] = useState<PracticeEngine | null>(null);
+  const attemptStartRef = useRef(0);
+  const addRecord = useProgress((s) => s.addRecord);
+  const recordResults = useWeakAreas((s) => s.recordResults);
 
   const resetDisplay = useCallback(() => {
     setIndex(0);
@@ -125,15 +130,36 @@ export default function BasslinePage() {
     resetDisplay();
   }, [sequence, resetDisplay]);
 
-  const stop = useCallback(() => {
-    engine?.stop();
-    setRunning(false);
-  }, [engine]);
+  const stop = useCallback(
+    (completed = false) => {
+      if (engine) {
+        const result = engine.summary;
+        if (completed || result.correct >= Math.max(2, sequence.steps.length / 2)) {
+          addRecord({
+            exercise: `Bassline · ${progression.map(chordLabel).join(" ")}`,
+            instrumentId: "bass-4",
+            bpm,
+            durationSeconds: Math.max(1, Math.round(now() - attemptStartRef.current)),
+            pitchAccuracy: result.pitchAccuracy,
+            timingAccuracy: result.timingAccuracy,
+            overall: result.overall,
+            notesCorrect: result.correct,
+            notesTotal: sequence.steps.length,
+          });
+          recordResults(engine.history);
+        }
+      }
+      engine?.stop();
+      setRunning(false);
+    },
+    [engine, addRecord, recordResults, progression, bpm, sequence],
+  );
 
   const start = useCallback(async () => {
     if (timed && !metronome.isRunning) await metronome.start();
     const fresh = new PracticeEngine(sequence);
     setEngine(fresh);
+    attemptStartRef.current = now();
     fresh.start(timed ? metronome.startedAt() : now());
     setRunning(true);
     resetDisplay();
@@ -180,7 +206,7 @@ export default function BasslinePage() {
       overall: result.overall,
     });
     setFlash(event.verdict === "correct" ? "correct" : event.verdict === "skipped" ? null : "wrong");
-    if (event.completed) stop();
+    if (event.completed) stop(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteEventId]);
 
