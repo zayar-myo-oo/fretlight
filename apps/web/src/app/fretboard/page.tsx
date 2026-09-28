@@ -11,6 +11,7 @@ import {
   getChordPositions,
   getScalePositions,
   getScaleShapes,
+  harmonicFunctionOf,
   intervalName,
   mod,
 } from "@fretlight/core";
@@ -323,24 +324,52 @@ export default function FretboardPage() {
 
         <div className="flex flex-col gap-6">
           <Panel title={mode === "scale" ? "Notes and degrees" : "Chord tones"}>
+            <p className="mb-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+              {mode === "scale" ? (
+                <>
+                  In <span className="readout text-[var(--color-signal)]">{scale.rootName} {scale.definition.name}</span>,{" "}
+                  {scale.rootName} is the <span className="text-[var(--color-ink)]">Root</span>
+                  {scale.notes.length === 7 ? " (Tonic)" : ""}. Useful chord tones sit at the
+                  1st, 3rd and 5th degrees.
+                </>
+              ) : (
+                <>
+                  <span className="readout text-[var(--color-signal)]">{chord.symbol}</span> is built from{" "}
+                  {chord.rootName}'s {chord.tones.map((t, i) => (
+                    <span key={t.degree}>
+                      {i > 0 && (i === chord.tones.length - 1 ? " and " : ", ")}
+                      {t.interval === 0 ? "root" : intervalName(t.interval).toLowerCase()}
+                    </span>
+                  ))}.
+                </>
+              )}
+            </p>
             <div className="flex flex-wrap gap-2">
-              {(mode === "scale" ? scale.notes : chord.tones).map((note) => (
-                <div
-                  key={`${note.degree}-${note.pitchClass}`}
-                  className={cn(
-                    "flex min-w-[68px] flex-col items-center gap-1 rounded-xl border px-3 py-2.5",
-                    note.interval === 0
-                      ? "border-[rgba(255,92,138,0.4)] bg-[rgba(255,92,138,0.1)]"
-                      : "border-[var(--color-hairline)] bg-[var(--color-void)]",
-                  )}
-                >
-                  <span className="readout text-lg font-semibold">{note.name}</span>
-                  <span className="readout text-[10px] text-[var(--color-ink-faint)]">{note.degree}</span>
-                  <span className="text-[9px] text-[var(--color-ink-faint)]">
-                    {intervalName(note.interval)}
-                  </span>
-                </div>
-              ))}
+              {(mode === "scale" ? scale.notes : chord.tones).map((note) => {
+                const harmonicFunction = mode === "scale" ? harmonicFunctionOf(note, scale.notes.length) : null;
+                return (
+                  <div
+                    key={`${note.degree}-${note.pitchClass}`}
+                    className={cn(
+                      "flex min-w-[68px] flex-col items-center gap-1 rounded-xl border px-3 py-2.5",
+                      note.interval === 0
+                        ? "border-[rgba(255,92,138,0.4)] bg-[rgba(255,92,138,0.1)]"
+                        : "border-[var(--color-hairline)] bg-[var(--color-void)]",
+                    )}
+                  >
+                    <span className="readout text-lg font-semibold">{note.name}</span>
+                    <span className="readout text-[10px] text-[var(--color-ink-faint)]">{note.degree}</span>
+                    <span className="text-[9px] text-[var(--color-ink-faint)]">
+                      {note.interval === 0 ? "Root" : intervalName(note.interval)}
+                    </span>
+                    {harmonicFunction && (
+                      <span className="text-[8px] tracking-wide text-[var(--color-theory)] uppercase">
+                        {harmonicFunction}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Panel>
 

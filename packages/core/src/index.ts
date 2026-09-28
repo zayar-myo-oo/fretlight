@@ -17,6 +17,7 @@ export * from "./theory/intervals";
 export * from "./theory/scales";
 export * from "./theory/chords";
 export * from "./theory/arpeggio";
+export * from "./theory/harmonic-function";
 
 // Instrument
 export * from "./instrument/tunings";
