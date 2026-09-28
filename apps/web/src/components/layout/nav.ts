@@ -66,4 +66,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     hint: "Turn a chord progression into a bassline to practice",
     icon: "M4 18V8l6-2v10M10 6l10-2v10M10 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm10-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   },
+  {
+    href: "/progress",
+    label: "Progress",
+    hint: "Practice time, accuracy and streaks",
+    icon: "M4 19V9m6.5 10V5m6.5 14v-7",
+  },
 ];

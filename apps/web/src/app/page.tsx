@@ -121,7 +121,17 @@ export default function HomePage() {
           </div>
         </Panel>
 
-        <Panel title="Your progress" meta={<Badge tone="neutral">stored on device</Badge>}>
+        <Panel
+          title="Your progress"
+          meta={
+            <>
+              <Badge tone="neutral">stored on device</Badge>
+              <Link href="/progress" className="hud-label text-[var(--color-signal)] hover:underline">
+                View all →
+              </Link>
+            </>
+          }
+        >
           {!mounted ? (
             <div className="h-24" />
           ) : summary.sessions === 0 ? (

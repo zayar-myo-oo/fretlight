@@ -54,18 +54,52 @@ export interface ProgressSummary {
   readonly totalMinutes: number;
   readonly sessions: number;
   readonly averageAccuracy: number;
+  readonly averagePitchAccuracy: number;
+  readonly averageTimingAccuracy: number;
   readonly bestAccuracy: number;
   readonly streakDays: number;
   readonly bestBpm: number;
 }
 
+export type ProgressRange = "today" | "week" | "month" | "all";
+
+/**
+ * Records within a range, most recent first (records are already stored that
+ * way). "Streak" is deliberately never computed from a filtered set — it is
+ * a single running number, not something that resets when you change which
+ * window you're looking at, so callers should always pass the *unfiltered*
+ * history to `summarise()` when they need `streakDays`.
+ */
+export function filterRecordsByRange(
+  records: readonly PracticeRecord[],
+  range: ProgressRange,
+): readonly PracticeRecord[] {
+  if (range === "all") return records;
+  const days = range === "today" ? 0 : range === "week" ? 6 : 29;
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - days);
+  return records.filter((record) => new Date(record.date) >= cutoff);
+}
+
 export function summarise(records: readonly PracticeRecord[]): ProgressSummary {
   if (records.length === 0) {
-    return { totalMinutes: 0, sessions: 0, averageAccuracy: 0, bestAccuracy: 0, streakDays: 0, bestBpm: 0 };
+    return {
+      totalMinutes: 0,
+      sessions: 0,
+      averageAccuracy: 0,
+      averagePitchAccuracy: 0,
+      averageTimingAccuracy: 0,
+      bestAccuracy: 0,
+      streakDays: 0,
+      bestBpm: 0,
+    };
   }
 
   const totalSeconds = records.reduce((sum, r) => sum + r.durationSeconds, 0);
   const averageAccuracy = records.reduce((sum, r) => sum + r.overall, 0) / records.length;
+  const averagePitchAccuracy = records.reduce((sum, r) => sum + r.pitchAccuracy, 0) / records.length;
+  const averageTimingAccuracy = records.reduce((sum, r) => sum + r.timingAccuracy, 0) / records.length;
 
   // Streak: count back from today over the set of distinct practice days.
   const days = new Set(records.map((r) => r.date.slice(0, 10)));
@@ -90,6 +124,8 @@ export function summarise(records: readonly PracticeRecord[]): ProgressSummary {
     totalMinutes: Math.round(totalSeconds / 60),
     sessions: records.length,
     averageAccuracy,
+    averagePitchAccuracy,
+    averageTimingAccuracy,
     bestAccuracy: Math.max(...records.map((r) => r.overall)),
     streakDays,
     bestBpm: Math.max(...records.map((r) => r.bpm)),
