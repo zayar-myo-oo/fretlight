@@ -49,4 +49,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     hint: "Learn a piece phrase by phrase",
     icon: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   },
+  {
+    href: "/bassline",
+    label: "Bassline",
+    hint: "Turn a chord progression into a bassline to practice",
+    icon: "M4 18V8l6-2v10M10 6l10-2v10M10 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm10-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  },
 ];

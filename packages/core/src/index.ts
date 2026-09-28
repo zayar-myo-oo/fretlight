@@ -48,6 +48,7 @@ export * from "./practice/sequence";
 export * from "./practice/practice-engine";
 export * from "./practice/scoring";
 export * from "./practice/drills";
+export * from "./practice/bassline";
 
 // Song / backing-track architecture
 export * from "./song/types";
