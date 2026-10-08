@@ -29,6 +29,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { playEvents } from "@/lib/audio/companion-player";
 import { pitchClassMarkers } from "@/lib/companion/markers";
+import { useT } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 interface ViewProps {
@@ -66,6 +67,9 @@ export function ChordTonesView({ board, progression, selected, lowStringOnTop }:
   const summaries = useMemo(() => targetNotes(progression), [progression]);
   const summary = summaries[selected] ?? summaries[0];
 
+  const t = useT();
+  const plan = useMemo(() => (summary ? planMove(board, summary.from.pitchClasses, summary.to.root) : null), [board, summary]);
+
   const markers = useMemo(() => {
     if (!summary) return [];
     const { from, to } = summary;
@@ -74,38 +78,138 @@ export function ChordTonesView({ board, progression, selected, lowStringOnTop }:
     const target = pitchClassMarkers(board, [to.root], nameMap, () => "target");
     const byKey = new Map<string, FretMarker>();
     for (const m of [...current, ...target]) byKey.set(`${m.string}:${m.fret}`, m);
+    // Number the suggested move (1 → 2) so "How to play it" points at real dots.
+    if (plan) {
+      const steps = plan.from ? [plan.from, plan.to] : [plan.to];
+      steps.forEach((spot, i) => {
+        const key = `${spot.string}:${spot.fret}`;
+        const existing = byKey.get(key);
+        if (existing) byKey.set(key, { ...existing, order: i + 1 });
+      });
+    }
     return [...byKey.values()];
-  }, [board, progression, summary]);
+  }, [board, progression, summary, plan]);
 
   if (!summary) return null;
   const { from, to } = summary;
+  const target = summary.target.name;
+  const home = progression.key.key?.rootName ?? null;
+  const spell = (pc: number) => spellPitchClass(pc, progression.key.key);
 
   return (
-    <Panel title="Chord tones and target notes">
-      <p className="mb-4 text-sm leading-relaxed text-[var(--color-ink-dim)]">
-        Chord tones are the notes a chord is built from. They sound right over that chord, so a melody that lands on them
-        always fits. The <span className="text-[var(--color-ink)]">target note</span> is where the melody wants to end up
-        when the chord changes.
-      </p>
+    <Panel title={t("tones.title")}>
+      <p className="mb-4 text-sm leading-relaxed text-[var(--color-ink-dim)]">{t("tones.intro")}</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card label="Current chord" value={from.symbol} detail={from.names.join("  ")} />
-        <Card label="Next chord" value={to.symbol} detail={to.names.join("  ")} />
-        <Card label="Shared notes" value={summary.commonTones.join("  ") || "none"} detail={summary.commonTones.length ? "Hold one across the change" : "Every note moves"} />
-        <Card label="Target note" value={summary.target.name} detail={`Root of ${to.symbol}`} accent />
+        <Card label={t("tones.current")} value={from.symbol} detail={from.names.join("  ")} />
+        <Card label={t("tones.next")} value={to.symbol} detail={to.names.join("  ")} />
+        <Card
+          label={t("tones.shared")}
+          value={summary.commonTones.join("  ") || t("tones.none")}
+          detail={summary.commonTones.length ? t("tones.sharedHold") : t("tones.sharedNone")}
+        />
+        <Card label={t("tones.target")} value={target} detail={t("tones.targetDetail", { chord: to.symbol })} accent />
       </div>
-      <p className="mt-3 text-sm text-[var(--color-ink-dim)]">{summary.target.reason}</p>
+      <p className="mt-3 text-sm text-[var(--color-ink-dim)]">{t("tones.reason", { target, chord: to.symbol })}</p>
+
+      {home && (
+        <div className="mt-4 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3">
+          <p className="text-sm font-medium">
+            {home === target ? t("tones.target") + ": " + target : t("tones.why.title", { target, home })}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-ink-dim)]">
+            {home === target ? t("tones.why.isHome", { home }) : `${t("tones.why.body", { home, target, from: from.symbol, to: to.symbol })} ${t("tones.why.home", { home })}`}
+          </p>
+        </div>
+      )}
+
+      {plan && (
+        <div className="mt-3 rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.05)] p-3">
+          <p className="hud-label">{t("tones.how.title")}</p>
+          <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-5 text-sm leading-relaxed text-[var(--color-ink-dim)]">
+            <li>{t("tones.how.step1", { from: from.symbol, notes: from.names.join(" "), root: from.names[0] ?? "" })}</li>
+            <li>{t("tones.how.step2")}</li>
+            <li className="text-[var(--color-ink)]">
+              {plan.from
+                ? t("tones.how.move", {
+                    to: to.symbol,
+                    target,
+                    fromNote: spell(plan.from.pitchClass),
+                    fromString: stringNumber(board, plan.from.string),
+                    fromFret: plan.from.fret,
+                    toString: stringNumber(board, plan.to.string),
+                    toFret: plan.to.fret,
+                    distance:
+                      plan.frets === 0 ? t("tones.sameFret") : plan.frets === 1 ? t("tones.fret") : t("tones.frets", { n: plan.frets }),
+                  })
+                : t("tones.how.hold", { target, from: from.symbol, to: to.symbol, string: stringNumber(board, plan.to.string), fret: plan.to.fret })}
+            </li>
+            <li>{t("tones.how.step4", { from: from.symbol, to: to.symbol, target })}</li>
+          </ol>
+          <p className="mt-2 text-xs text-[var(--color-ink-faint)]">{t("tones.how.why", { target, to: to.symbol })}</p>
+        </div>
+      )}
+
       <div className="mt-4">
         <Fretboard board={board} markers={markers} lowStringOnTop={lowStringOnTop} />
         <Legend
           items={[
-            { color: COLORS.root, label: `Root of ${from.symbol}` },
-            { color: COLORS.chord, label: `Other ${from.symbol} tones` },
-            { color: COLORS.target, label: `Target: ${summary.target.name}` },
+            { color: COLORS.root, label: t("tones.legend.root", { chord: from.symbol }) },
+            { color: COLORS.chord, label: t("tones.legend.other", { chord: from.symbol }) },
+            { color: COLORS.target, label: t("tones.legend.target", { note: target }) },
           ]}
         />
       </div>
     </Panel>
   );
+}
+
+interface Spot {
+  readonly string: number;
+  readonly fret: number;
+  readonly pitchClass: number;
+}
+
+/** Strings are numbered the way players count them: 1 is the highest-pitched string. */
+function stringNumber(board: Board, string: number): number {
+  const open = board.openMidi[string]!;
+  return 1 + board.openMidi.filter((m) => m > open).length;
+}
+
+/**
+ * The easiest concrete way to reach the target in the lower half of the neck.
+ * If the target is already a note of the current chord, there is nothing to
+ * move: hold it. Otherwise pick the current-chord note closest to a target
+ * spot, so the hand barely moves.
+ */
+function planMove(board: Board, fromPcs: readonly number[], targetPc: number): { from: Spot | null; to: Spot; frets: number } | null {
+  const maxFret = Math.min(board.fretCount, 12);
+  const spots: Spot[] = [];
+  for (let string = 0; string < board.stringCount; string++) {
+    for (let fret = 0; fret <= maxFret; fret++) spots.push({ string, fret, pitchClass: mod(board.openMidi[string]! + fret, 12) });
+  }
+  const target = mod(targetPc, 12);
+  const targets = spots.filter((s) => s.pitchClass === target);
+  if (targets.length === 0) return null;
+  const chordPcs = new Set(fromPcs.map((p) => mod(p, 12)));
+
+  if (chordPcs.has(target)) {
+    // Prefer a fretted note around the open position: easy to find and to sustain.
+    const to = [...targets].sort((a, b) => Math.abs(a.fret - 3) - Math.abs(b.fret - 3) || a.string - b.string)[0]!;
+    return { from: null, to, frets: 0 };
+  }
+
+  let best: { from: Spot; to: Spot; cost: number } | null = null;
+  for (const from of spots) {
+    if (!chordPcs.has(from.pitchClass)) continue;
+    for (const to of targets) {
+      const stringGap = Math.abs(from.string - to.string);
+      if (stringGap > 1) continue;
+      const cost = Math.abs(from.fret - to.fret) + stringGap * 0.5 + Math.max(from.fret, to.fret) * 0.05;
+      if (!best || cost < best.cost) best = { from, to, cost };
+    }
+  }
+  if (!best) return { from: null, to: targets[0]!, frets: 0 };
+  return { from: best.from, to: best.to, frets: Math.abs(best.from.fret - best.to.fret) };
 }
 
 function Card({ label, value, detail, accent }: { label: string; value: string; detail: string; accent?: boolean }) {

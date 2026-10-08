@@ -3,35 +3,32 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
+import { useT, type MessageKey } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 export type GuideTarget = string;
 
 interface Step {
   readonly view: GuideTarget;
-  readonly title: string;
-  readonly learn: string;
-  readonly cta: string;
+  readonly title: MessageKey;
+  readonly learn: MessageKey;
+  readonly cta: MessageKey;
 }
 
-const GUITAR_STEPS: readonly Step[] = [
-  { view: "cowboy", title: "Know your chords", learn: "Play each chord of the progression as an open shape. This is the foundation: you can hear the harmony before adding anything.", cta: "Open cowboy chords" },
-  { view: "triads", title: "Find the triad inside", learn: "Every chord hides three strong notes: the root, 3rd and 5th. Learn where they sit on the neck, in three different orders.", cta: "Show triads" },
-  { view: "tones", title: "Aim for the target note", learn: "When the chord changes, ending on the right note makes your line sound planned. See which note to aim for, and which notes the two chords share.", cta: "Show chord tones and targets" },
-  { view: "fills", title: "Add a short fill", learn: "Fill the gap before a chord change with a few notes that start on the current chord and land on the next chord's target.", cta: "Try a fill" },
-  { view: "lead", title: "Build a melody", learn: "Chain chord tones through every chord, joined by passing notes. This is the lead-guitar idea: land on triad notes instead of running up and down a scale.", cta: "Build a melody" },
-  { view: "practice", title: "Practice over the loop", learn: "Let the progression repeat and improvise with the triad lit up. When it feels easy, switch on the fill, then take the highlights away.", cta: "Go to practice" },
-  { view: "looper", title: "Record yourself", learn: "Record the chords in the Looper, then play the triads, targets and fills over your own loop. Add a bass line on top.", cta: "Open the Looper" },
-];
+const step = (view: string, key = view, overrides: Partial<Omit<Step, "view">> = {}): Step => ({
+  view,
+  title: `guide.${key}.title` as MessageKey,
+  learn: `guide.${key}.learn` as MessageKey,
+  cta: `guide.${key}.cta` as MessageKey,
+  ...overrides,
+});
+
+const GUITAR_STEPS: readonly Step[] = ["cowboy", "triads", "tones", "fills", "lead", "practice", "looper"].map((view) => step(view));
 
 const BASS_STEPS: readonly Step[] = [
-  { view: "bass-root", title: "Lock in the roots", learn: "Play the root of each chord, held for the whole bar. This is the bass's main job: tell everyone which chord this is.", cta: "Play root notes" },
-  { view: "bass-rootfifth", title: "Add the 5th", learn: "Root then 5th gives movement without ever sounding wrong, in major or minor.", cta: "Try root + 5th" },
-  { view: "bass-passing", title: "Connect with passing notes", learn: "Chord tones go on the strong beats; short notes in between connect them.", cta: "Try passing notes" },
-  { view: "bass-approach", title: "Lead into the next chord", learn: "A note a half step from the next root pulls the ear toward it. It is the simplest fill there is.", cta: "Try approach notes" },
-  { view: "bass-walking", title: "Walk through the chords", learn: "Four even notes a bar that climb or fall through the chord and arrive on the next root.", cta: "Try walking bass" },
-  { view: "practice", title: "Practice over the loop", learn: "Play along with the progression on repeat, and turn on the bass fill once the basic line feels solid.", cta: "Go to practice" },
-  { view: "looper", title: "Record a bass line", learn: "Record a guitar loop (or ask a bandmate), then add your bass line on top in the Looper.", cta: "Open the Looper" },
+  ...["bass-root", "bass-rootfifth", "bass-passing", "bass-approach", "bass-walking"].map((view) => step(view)),
+  step("practice", "practice", { learn: "guide.bass-practice.learn" }),
+  step("looper", "looper", { title: "guide.bass-looper.title", learn: "guide.bass-looper.learn" }),
 ];
 
 const KEY = "fretlight.companion.guideHidden";
@@ -53,6 +50,7 @@ export function LearningGuide({
   onGo: (view: GuideTarget) => void;
 }) {
   const [open, setOpen] = useState(true);
+  const t = useT();
   useEffect(() => {
     try {
       if (localStorage.getItem(KEY) === "1") setOpen(false);
@@ -77,7 +75,7 @@ export function LearningGuide({
     return (
       <div>
         <Button size="sm" variant="ghost" onClick={() => toggle(true)}>
-          ? How do I learn with this?
+          {t("guide.show")}
         </Button>
       </div>
     );
@@ -85,18 +83,16 @@ export function LearningGuide({
 
   return (
     <Panel
-      title="How to learn with the Companion"
+      title={t("guide.title")}
       meta={
         <Button size="sm" variant="ghost" onClick={() => toggle(false)}>
-          Hide
+          {t("guide.hide")}
         </Button>
       }
     >
       <div className="flex flex-col gap-4">
         <p className="max-w-3xl text-sm leading-relaxed text-[var(--color-ink-dim)]">
-          Not sure where to start? Type the chords your band is playing (or listen to them below), then work down
-          these steps one at a time. Each step builds on the one before it, and there is no need to do them all in one
-          sitting.
+          {t("guide.intro")}
         </p>
         <ol className="flex flex-col gap-2">
           {steps.map((step, i) => {
@@ -115,16 +111,16 @@ export function LearningGuide({
                     "readout flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs",
                     done ? "border-[var(--color-correct,#39e08b)] text-[var(--color-correct,#39e08b)]" : "border-[var(--color-hairline-bright)] text-[var(--color-ink-faint)]",
                   )}
-                  aria-label={done ? "visited" : `step ${i + 1}`}
+                  aria-label={done ? t("guide.visited") : t("guide.step", { n: i + 1 })}
                 >
                   {done ? "✓" : i + 1}
                 </span>
                 <div className="min-w-[220px] flex-1">
-                  <p className="text-sm font-medium">{step.title}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-dim)]">{step.learn}</p>
+                  <p className="text-sm font-medium">{t(step.title)}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-[var(--color-ink-dim)]">{t(step.learn)}</p>
                 </div>
                 <Button size="sm" variant={current ? "primary" : "secondary"} onClick={() => onGo(step.view)}>
-                  {step.cta}
+                  {t(step.cta)}
                 </Button>
               </li>
             );

@@ -10,7 +10,12 @@ import { useDetection } from "@/hooks/useDetection";
 import { useMounted } from "@/hooks/useMounted";
 import { resolveTuning } from "@/lib/tuning/resolve-tuning";
 import { cn } from "@/lib/ui/cn";
-import { NAV_ITEMS } from "./nav";
+import { useHtmlLang, useT, type MessageKey } from "@/lib/i18n/locale";
+import { LanguageSwitch } from "./LanguageSwitch";
+import { NAV_ITEMS, type NavItem } from "./nav";
+
+const label = (item: NavItem) => `nav.${item.href}` as MessageKey;
+const hint = (item: NavItem) => `nav.${item.href}.hint` as MessageKey;
 
 /**
  * Application chrome: an icon rail on desktop, a tab bar on phones.
@@ -21,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Applies calibration (gain/noise gate/smoothing) to detectionHub wherever
   // the player left the settings, regardless of which page opened the input.
   useCalibration();
+  useHtmlLang();
 
   return (
     <div className="stack flex min-h-dvh flex-col md:flex-row">
@@ -58,6 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
  */
 function MobileTabBar({ pathname }: { pathname: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const t = useT();
   const primary = NAV_ITEMS.filter((item) => item.mobilePrimary);
   const overflow = NAV_ITEMS.filter((item) => !item.mobilePrimary);
   const overflowActive = overflow.some((item) => isActive(pathname, item.href));
@@ -72,7 +79,7 @@ function MobileTabBar({ pathname }: { pathname: string }) {
       {moreOpen && (
         <>
           <button
-            aria-label="Close menu"
+            aria-label={t("nav.closeMenu")}
             onClick={() => setMoreOpen(false)}
             className="fixed inset-0 z-40 bg-[rgba(4,6,11,0.6)] backdrop-blur-sm md:hidden"
           />
@@ -92,7 +99,7 @@ function MobileTabBar({ pathname }: { pathname: string }) {
                     )}
                   >
                     <Icon path={item.icon} />
-                    <span className="text-xs font-medium">{item.label}</span>
+                    <span className="text-xs font-medium">{t(label(item))}</span>
                   </Link>
                 );
               })}
@@ -114,21 +121,21 @@ function MobileTabBar({ pathname }: { pathname: string }) {
               )}
             >
               <Icon path={item.icon} />
-              <span className="text-[9px] tracking-wider uppercase">{item.label}</span>
+              <span className="text-[9px] tracking-wider uppercase">{t(label(item))}</span>
             </Link>
           );
         })}
         <button
           onClick={() => setMoreOpen((open) => !open)}
           aria-expanded={moreOpen}
-          aria-label="More"
+          aria-label={t("nav.more")}
           className={cn(
             "flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors",
             moreOpen || overflowActive ? "text-[var(--color-signal)]" : "text-[var(--color-ink-faint)]",
           )}
         >
           <Icon path="M5 12h.01M12 12h.01M19 12h.01M5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
-          <span className="text-[9px] tracking-wider uppercase">More</span>
+          <span className="text-[9px] tracking-wider uppercase">{t("nav.more")}</span>
         </button>
       </nav>
     </>
@@ -139,11 +146,12 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
-function RailLink({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: boolean }) {
+function RailLink({ item, active }: { item: NavItem; active: boolean }) {
+  const t = useT();
   return (
     <Link
       href={item.href}
-      title={item.hint}
+      title={t(hint(item))}
       className={cn(
         "group relative flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-200",
         active
@@ -156,7 +164,7 @@ function RailLink({ item, active }: { item: (typeof NAV_ITEMS)[number]; active: 
       )}
       <Icon path={item.icon} />
       <span className="pointer-events-none absolute left-[60px] z-50 hidden whitespace-nowrap rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2.5 py-1.5 text-xs text-[var(--color-ink)] group-hover:block">
-        {item.label}
+        {t(label(item))}
       </span>
     </Link>
   );
@@ -167,6 +175,7 @@ function TopBar() {
   const tuningId = useSession((s) => s.tuningId);
   const customTunings = useSession((s) => s.customTunings);
   const mounted = useMounted();
+  const t = useT();
 
   const instrument = getInstrument(instrumentId);
   const tuning = resolveTuning(instrumentId, tuningId, customTunings);
@@ -187,7 +196,8 @@ function TopBar() {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <span className="hud-label hidden sm:inline">Offline capable</span>
+        <span className="hud-label hidden sm:inline">{t("shell.offline")}</span>
+        <LanguageSwitch />
         <ListeningDot />
       </div>
     </header>
@@ -196,6 +206,7 @@ function TopBar() {
 
 function ListeningDot() {
   const { listening, sourceLabel, rms } = useDetection();
+  const t = useT();
   return (
     <span
       className="flex items-center gap-2"
@@ -215,7 +226,7 @@ function ListeningDot() {
           )}
         />
       </span>
-      <span className="hud-label hidden md:inline">{listening ? "Live" : "Idle"}</span>
+      <span className="hud-label hidden md:inline">{listening ? t("shell.live") : t("shell.idle")}</span>
     </span>
   );
 }

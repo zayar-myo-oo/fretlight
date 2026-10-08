@@ -11,19 +11,21 @@ import { cn } from "@/lib/ui/cn";
 import { summarise, useProgress } from "@/store/progress";
 import { useSession } from "@/store/session";
 import { useWeakAreas } from "@/store/weak-areas";
+import { useT, type MessageKey } from "@/lib/i18n/locale";
 
 /** The six things people come to Fretlight to do, each pointing at the one place that does it. */
 const INTENTS = [
-  { href: "/tuner", icon: "🎚", title: "Tune my instrument", text: "Get in tune before anything else." },
-  { href: "/practice", icon: "🎯", title: "Practise", text: "Short drills that listen and score you." },
-  { href: "/companion?tab=ideas", icon: "💡", title: "I don't know what to play", text: "Type the chords; get fills, melodies and bass lines that fit." },
-  { href: "/companion?tab=loop", icon: "🔁", title: "Play over a loop", text: "Record your chords, loop them, and play on top." },
-  { href: "/analyzer", icon: "🎵", title: "Learn a song", text: "Load a song file to get its chords, key and sections." },
-  { href: "/fretboard", icon: "🧭", title: "Understand the fretboard", text: "Scales, chords and what each note does." },
+  { href: "/tuner", icon: "🎚", key: "tune" },
+  { href: "/practice", icon: "🎯", key: "practice" },
+  { href: "/companion?tab=ideas", icon: "💡", key: "ideas" },
+  { href: "/companion?tab=loop", icon: "🔁", key: "loop" },
+  { href: "/analyzer", icon: "🎵", key: "song" },
+  { href: "/fretboard", icon: "🧭", key: "fretboard" },
 ] as const;
 
 export default function HomePage() {
   const mounted = useMounted();
+  const t = useT();
   const instrumentId = useSession((s) => s.instrumentId);
   const tuningId = useSession((s) => s.tuningId);
   const setInstrument = useSession((s) => s.setInstrument);
@@ -40,11 +42,10 @@ export default function HomePage() {
     <div className="flex flex-col gap-6">
       <section className="animate-rise">
         <h1 className="text-gradient max-w-3xl text-4xl leading-[1.08] font-semibold tracking-tight md:text-5xl">
-          What do you want to do?
+          {t("home.title")}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-dim)] md:text-base">
-          Fretlight is a practice companion for guitar and bass. It listens to you play, shows you where the notes are,
-          and explains why they work. Everything runs on this device; your audio is never uploaded.
+          {t("home.intro")}
         </p>
       </section>
 
@@ -57,15 +58,15 @@ export default function HomePage() {
           >
             <span aria-hidden className="text-2xl leading-none">{intent.icon}</span>
             <span className="flex flex-col gap-0.5">
-              <span className="text-base font-semibold">{intent.title} <span className="text-[var(--color-ink-faint)] group-hover:text-[var(--color-signal)]">→</span></span>
-              <span className="text-xs leading-relaxed text-[var(--color-ink-faint)]">{intent.text}</span>
+              <span className="text-base font-semibold">{t(`home.intent.${intent.key}` as MessageKey)} <span className="text-[var(--color-ink-faint)] group-hover:text-[var(--color-signal)]">→</span></span>
+              <span className="text-xs leading-relaxed text-[var(--color-ink-faint)]">{t(`home.intent.${intent.key}.text` as MessageKey)}</span>
             </span>
           </Link>
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <Panel title="Your instrument" meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Used everywhere: tuner, fretboard, tabs, practice</span>}>
+        <Panel title={t("home.instrument")} meta={<span className="text-[11px] text-[var(--color-ink-faint)]">{t("home.instrument.meta")}</span>}>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {INSTRUMENTS.map((option) => {
               const active = mounted && option.id === instrumentId;
@@ -82,7 +83,7 @@ export default function HomePage() {
                   )}
                 >
                   <span className="text-sm font-medium">{option.name}</span>
-                  <span className="readout text-[10px] text-[var(--color-ink-faint)]">{option.stringCount} strings</span>
+                  <span className="readout text-[10px] text-[var(--color-ink-faint)]">{t("home.strings", { n: option.stringCount })}</span>
                 </button>
               );
             })}
@@ -90,7 +91,7 @@ export default function HomePage() {
 
           {mounted && tunings.length > 0 && (
             <div className="mt-4 border-t border-[var(--color-hairline)] pt-4">
-              <h3 className="hud-label mb-2.5">Tuning</h3>
+              <h3 className="hud-label mb-2.5">{t("home.tuning")}</h3>
               <div className="flex flex-wrap gap-2">
                 {tunings.map((tuning) => {
                   const active = tuning.id === tuningId;
@@ -115,10 +116,10 @@ export default function HomePage() {
         </Panel>
 
         <Panel
-          title="Your progress"
+          title={t("home.progress")}
           meta={
             <Link href="/progress" className="hud-label text-[var(--color-signal)] hover:underline">
-              See all →
+              {t("home.seeAll")}
             </Link>
           }
         >
@@ -126,19 +127,19 @@ export default function HomePage() {
             <div className="h-24" />
           ) : summary.sessions === 0 ? (
             <p className="text-sm leading-relaxed text-[var(--color-ink-faint)]">
-              No practice yet. Finish one drill in Practice and your progress starts here. It stays on this device.
+              {t("home.noProgress")}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-5">
-              <Stat label="Sessions" value={summary.sessions} />
-              <Stat label="Practice time" value={summary.totalMinutes} unit="min" />
-              <Stat label="Avg accuracy" value={`${Math.round(summary.averageAccuracy * 100)}%`} tone="signal" />
-              <Stat label="Streak" value={summary.streakDays} unit="days" tone="correct" />
+              <Stat label={t("home.sessions")} value={summary.sessions} />
+              <Stat label={t("home.time")} value={summary.totalMinutes} unit={t("home.min")} />
+              <Stat label={t("home.accuracy")} value={`${Math.round(summary.averageAccuracy * 100)}%`} tone="signal" />
+              <Stat label={t("home.streak")} value={summary.streakDays} unit={t("home.days")} tone="correct" />
             </div>
           )}
           {next && (
             <Link href={next.href} className="mt-4 block rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.06)] p-3 hover:bg-[rgba(34,224,214,0.12)]">
-              <span className="hud-label block">Next step</span>
+              <span className="hud-label block">{t("home.nextStep")}</span>
               <span className="text-sm font-semibold">{next.title} →</span>
               <span className="mt-0.5 block text-xs text-[var(--color-ink-dim)]">{next.detail}</span>
             </Link>
@@ -146,7 +147,7 @@ export default function HomePage() {
         </Panel>
       </div>
 
-      <Panel title="All tools">
+      <Panel title={t("home.allTools")}>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {NAV_ITEMS.filter((item) => item.href !== "/").map((item) => (
             <Link
@@ -158,8 +159,8 @@ export default function HomePage() {
                 <path d={item.icon} />
               </svg>
               <span className="flex min-w-0 flex-col">
-                <span className="text-sm font-medium">{item.label}</span>
-                <span className="truncate text-[11px] text-[var(--color-ink-faint)]">{item.hint}</span>
+                <span className="text-sm font-medium">{t(`nav.${item.href}` as MessageKey)}</span>
+                <span className="truncate text-[11px] text-[var(--color-ink-faint)]">{t(`nav.${item.href}.hint` as MessageKey)}</span>
               </span>
             </Link>
           ))}
