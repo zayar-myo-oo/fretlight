@@ -21,6 +21,7 @@ import { DisplayMenu } from "@/components/fretboard/DisplayMenu";
 import { SoundMenu } from "@/components/fretboard/SoundMenu";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { PositionControl } from "@/components/fretboard/PositionControl";
+import { type InspectedNote, NoteInspector } from "@/components/fretboard/NoteInspector";
 import { Badge } from "@/components/ui/Badge";
 import { NotePicker } from "@/components/ui/NotePicker";
 import { Panel } from "@/components/ui/Panel";
@@ -117,9 +118,11 @@ export function ExploreMode() {
     [scale],
   );
 
-  const onSelect = (p: { midi: number }) => {
+  const [inspected, setInspected] = useState<InspectedNote | null>(null);
+  const onSelect = (p: { string: number; fret: number; midi: number }) => {
     detectionHub.mock?.pluck(p.midi);
     void fretSynth.pluck(p.midi);
+    setInspected({ string: p.string, fret: p.fret, midi: p.midi });
   };
 
   const title = kind === "scale" ? `${scale.rootName} ${scale.definition.name}` : chord.symbol;
@@ -221,8 +224,21 @@ export function ExploreMode() {
               {selectedShape.anchorDegree}
             </span>
           )}
-          <span className="ml-auto">Tap any fret to hear it</span>
+          <span className="ml-auto">Tap any note to hear it and see what it does</span>
         </div>
+
+        {inspected && (
+          <div className="mt-4">
+            <NoteInspector
+              note={inspected}
+              scale={scale}
+              chord={chord}
+              kind={kind}
+              stringName={board.tuning.strings[inspected.string]?.replace(/[0-9]+/, "") ?? ""}
+              onClose={() => setInspected(null)}
+            />
+          </div>
+        )}
 
         <details className="mt-4 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] px-3 py-2">
           <summary className="cursor-pointer text-xs text-[var(--color-ink-dim)]">

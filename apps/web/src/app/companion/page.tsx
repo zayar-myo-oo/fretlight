@@ -80,9 +80,26 @@ function Companion() {
     return isTab(requested) ? requested : params.get("prog") ? "ideas" : "loop";
   });
   const [text, setText] = useState(params.get("prog") || "C G Am F");
-  const [instrument, setInstrument] = useState<"guitar" | "bass">(
-    params.get("instrument") === "bass" ? "bass" : params.get("instrument") === "guitar" ? "guitar" : instrumentKind,
+  // The instrument is app-wide (Home, Tuner, Fretboard all share it), not a Companion-only setting.
+  const instrument = instrumentKind;
+  const setGlobalInstrument = useSession((s) => s.setInstrument);
+  const setInstrument = useCallback(
+    (kind: "guitar" | "bass") => {
+      if (kind !== instrumentKind) setGlobalInstrument(kind === "bass" ? "bass-4" : "guitar-6");
+    },
+    [instrumentKind, setGlobalInstrument],
   );
+  const setBpm = useSession((s) => s.setBpm);
+  const sessionBpm = useSession((s) => s.bpm);
+  // Links from the Analyzer / Bassline carry the instrument and tempo along.
+  useEffect(() => {
+    const wanted = params.get("instrument");
+    if (wanted === "guitar" || wanted === "bass") setInstrument(wanted);
+    const bpm = Number(params.get("bpm"));
+    if (bpm >= 40 && bpm <= 240) setBpm(bpm);
+    if (params.get("focus") === "practice") setTimeout(() => document.getElementById("practice")?.scrollIntoView({ behavior: "smooth" }), 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [style, setStyle] = useState<CompanionStyle>(isStyle(params.get("style")) ? (params.get("style") as CompanionStyle) : "popPunk");
   const [difficulty, setDifficulty] = useState<Difficulty>(isDifficulty(params.get("difficulty")) ? (params.get("difficulty") as Difficulty) : "intermediate");
   const [view, setView] = useState<View>("tones");
@@ -145,6 +162,12 @@ function Companion() {
   };
 
   const goGuide = (target: string) => {
+    if (target === "looper") {
+      setVisited((v) => new Set(v).add("looper"));
+      setTab("loop");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     if (target === "practice") {
       setVisited((v) => new Set(v).add("practice"));
       document.getElementById("practice")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -248,6 +271,7 @@ function Companion() {
       {/* The looper stays mounted when hidden, so switching tabs never loses a recording. */}
       <div className={cn(tab !== "loop" && "hidden")}>
         <LooperPanel
+          active={tab === "loop"}
           engine={engine}
           state={looper}
           progression={progression}
@@ -263,6 +287,15 @@ function Companion() {
       {tab === "ideas" && (
         <div className="flex flex-col gap-6">
           <LearningGuide instrument={instrument} active={activeView} visited={visited} onGo={goGuide} />
+
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] px-4 py-3 text-sm">
+            <span className="min-w-[200px] flex-1 text-[var(--color-ink-dim)]">
+              Ideas work best over real music. Record {progression.chords.map((c) => c.symbol).join(" ") || "your chords"} in the Looper and play these on top.
+            </span>
+            <Button size="sm" onClick={() => { setTab("loop"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+              Open the Looper →
+            </Button>
+          </div>
 
           {current && (
             <Disclosure
@@ -326,7 +359,7 @@ function Companion() {
                   style={style}
                   difficulty={difficulty}
                   progressionText={text}
-                  bpm={100}
+                  bpm={sessionBpm}
                   lowStringOnTop={lowStringOnTop}
                   onAnother={() => setVariant((v) => v + 1)}
                   fillBeats={fillBeats}

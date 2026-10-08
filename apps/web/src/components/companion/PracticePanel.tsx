@@ -16,6 +16,7 @@ import { Panel } from "@/components/ui/Panel";
 import { ProgressionLoop } from "@/lib/audio/progression-loop";
 import { pitchClassMarkers } from "@/lib/companion/markers";
 import { cn } from "@/lib/ui/cn";
+import { useSession } from "@/store/session";
 
 type Layer = "triad" | "scale" | "tones" | "fill";
 
@@ -35,7 +36,9 @@ export function PracticePanel({
 }) {
   const loop = useRef<ProgressionLoop | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [bpm, setBpm] = useState(90);
+  // Starts at the app-wide tempo, so a progression sent from the Analyzer plays at its own speed.
+  const sessionBpm = useSession((s) => s.bpm);
+  const [bpm, setBpm] = useState(() => Math.min(160, Math.max(50, sessionBpm)));
   const [current, setCurrent] = useState(0);
   const [layers, setLayers] = useState<ReadonlySet<Layer>>(new Set(["triad", "tones"]));
 

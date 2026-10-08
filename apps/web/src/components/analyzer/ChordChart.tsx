@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChartSection, type ChordDetection, type MusicKey, formatTimestamp, spellChord } from "@fretlight/core";
+import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { cn } from "@/lib/ui/cn";
 
@@ -13,6 +14,7 @@ export function ChordChart({
   activeSection,
   onSeek,
   onSelectChord,
+  sectionLink,
 }: {
   chart: readonly ChartSection[];
   chords: readonly ChordDetection[];
@@ -21,12 +23,17 @@ export function ChordChart({
   activeSection: number;
   onSeek: (seconds: number) => void;
   onSelectChord: (index: number) => void;
+  /** Where "Practice this section" goes, or null when the section has no progression. */
+  sectionLink?: (index: number) => string | null;
 }) {
   return (
     <Panel title="3 · Chord chart" meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Tap a bar or heading to jump there</span>}>
       <div className="flex flex-col gap-6">
-        {chart.map(({ section, rows }, s) => (
+        {chart.map(({ section, rows }, s) => {
+          const practice = sectionLink?.(s) ?? null;
+          return (
           <section key={s}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
             <button
               onClick={() => onSeek(section.start)}
               className={cn(
@@ -39,6 +46,12 @@ export function ChordChart({
                 {formatTimestamp(section.start)} – {formatTimestamp(section.end)}
               </span>
             </button>
+            {practice && (
+              <Link href={practice} className="text-[11px] text-[var(--color-ink-dim)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-signal)]">
+                Practice this section →
+              </Link>
+            )}
+            </div>
             <div className="flex flex-col gap-1.5">
               {rows.map((row, r) => (
                 <div key={r} className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -75,7 +88,8 @@ export function ChordChart({
               ))}
             </div>
           </section>
-        ))}
+        );
+        })}
       </div>
     </Panel>
   );

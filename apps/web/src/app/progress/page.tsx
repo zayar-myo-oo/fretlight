@@ -1,6 +1,7 @@
 "use client";
 
-import { SHARP_NAMES } from "@fretlight/core";
+import { SHARP_NAMES, compareWithPreviousDay, recommendations as buildRecommendations, skillMap } from "@fretlight/core";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
@@ -46,10 +47,9 @@ export default function ProgressPage() {
   // that a single week's handful of attempts is too little data to show.
   const weakestNotes = useMemo(() => weakestSpots(weakNotes), [weakNotes]);
   const weakestPositions = useMemo(() => weakestSpots(weakPositions), [weakPositions]);
-  const recommendation = useMemo(
-    () => buildRecommendation(weakestNotes, weakestPositions),
-    [weakestNotes, weakestPositions],
-  );
+  const comparison = useMemo(() => (mounted ? compareWithPreviousDay(records) : null), [records, mounted]);
+  const skills = useMemo(() => skillMap(records, weakNotes, weakPositions), [records, weakNotes, weakPositions]);
+  const nextSteps = useMemo(() => buildRecommendations(records, weakNotes), [records, weakNotes]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -125,10 +125,70 @@ export default function ProgressPage() {
         </div>
       )}
 
-      {recommendation && (
-        <Panel title="Recommended next" meta={<Badge tone="signal">from your own data</Badge>}>
-          <p className="text-sm leading-relaxed text-[var(--color-ink-dim)]">{recommendation}</p>
+      {mounted && (
+        <Panel title="What to practise next" meta={<Badge tone="signal">from your own data</Badge>}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {nextSteps.map((step) => (
+              <Link
+                key={step.title}
+                href={step.href}
+                className="flex flex-col gap-1 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-4 transition-colors hover:border-[var(--color-signal)]"
+              >
+                <span className="text-sm font-semibold">{step.title} →</span>
+                <span className="text-xs leading-relaxed text-[var(--color-ink-dim)]">{step.detail}</span>
+              </Link>
+            ))}
+            {nextSteps.length === 0 && (
+              <p className="text-sm text-[var(--color-ink-dim)]">Nothing stands out. Keep going, or try a faster tempo in Practice.</p>
+            )}
+          </div>
         </Panel>
+      )}
+
+      {mounted && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Panel title="Improvement">
+            {comparison ? (
+              <div className="flex flex-wrap items-end gap-6">
+                <Stat label={comparison.previousLabel} value={`${Math.round(comparison.previous * 100)}%`} />
+                <Stat label="Today" value={`${Math.round(comparison.today * 100)}%`} tone="signal" />
+                <Stat
+                  label="Change"
+                  value={`${comparison.delta >= 0 ? "+" : ""}${Math.round(comparison.delta * 100)}%`}
+                  tone={comparison.delta >= 0 ? "correct" : "default"}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-ink-faint)]">Practise today and on another day to see how you are improving.</p>
+            )}
+          </Panel>
+          <Panel title="Skill map" meta={<span className="hud-label">only what has been measured</span>}>
+            <div className="flex flex-col gap-2.5">
+              {skills.map((skill) => (
+                <div key={skill.id} className="flex items-center gap-3">
+                  <span className="w-36 shrink-0 text-xs">{skill.label}</span>
+                  {skill.score === null ? (
+                    <span className="text-[11px] text-[var(--color-ink-faint)]">Not enough data yet</span>
+                  ) : (
+                    <>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-hairline)]" role="meter" aria-valuenow={Math.round(skill.score * 100)} aria-valuemin={0} aria-valuemax={100} aria-label={skill.label}>
+                        <div
+                          className={cn("h-full rounded-full", skill.score < 0.5 ? "bg-[var(--color-error)]" : skill.score < 0.75 ? "bg-[var(--color-warn)]" : "bg-[var(--color-correct)]")}
+                          style={{ width: `${Math.round(skill.score * 100)}%` }}
+                        />
+                      </div>
+                      <span className="readout w-10 text-right text-[11px]">{Math.round(skill.score * 100)}%</span>
+                    </>
+                  )}
+                </div>
+              ))}
+              <p className="mt-1 text-[11px] text-[var(--color-ink-faint)]">
+                Fills, improvising and chord changes are not scored yet. Practise them in the{" "}
+                <Link href="/companion" className="underline">Companion</Link>.
+              </p>
+            </div>
+          </Panel>
+        </div>
       )}
 
       <Panel title="Recent sessions">
@@ -203,33 +263,6 @@ function WeakBar({ label, spot }: { label: string; spot: WeakSpot }) {
       </span>
     </div>
   );
-}
-
-/**
- * A recommendation built only from what `weakestSpots` actually found — no
- * fixed catalogue of tips, no fallback that fires when there is no real
- * pattern. If nothing has enough attempts yet, this returns null and the
- * panel does not render at all rather than showing something generic.
- */
-function buildRecommendation(notes: readonly WeakSpot[], positions: readonly WeakSpot[]): string | null {
-  const worstNote = notes[0];
-  const worstPosition = positions[0];
-  if (!worstNote && !worstPosition) return null;
-
-  const parts: string[] = [];
-  if (worstNote) {
-    const name = SHARP_NAMES[Number(worstNote.key)];
-    parts.push(
-      `You're landing ${name} correctly only ${Math.round(worstNote.accuracy * 100)}% of the time over ${worstNote.attempts} attempts — a Note drill on ${name} would target it directly.`,
-    );
-  }
-  if (worstPosition) {
-    const [string, fret] = worstPosition.key.split(":");
-    parts.push(
-      `String ${Number(string) + 1}, fret ${fret} is your weakest specific position at ${Math.round(worstPosition.accuracy * 100)}% over ${worstPosition.attempts} attempts — a Fret drill would isolate it.`,
-    );
-  }
-  return parts.join(" ");
 }
 
 function formatDuration(totalMinutes: number): string {

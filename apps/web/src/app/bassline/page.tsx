@@ -21,6 +21,7 @@ import {
   phraseToSequence,
   progressionLengthBeats,
 } from "@fretlight/core";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InputSourcePanel } from "@/components/audio/InputSourcePanel";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
@@ -323,6 +324,24 @@ export default function BasslinePage() {
             Reset to example
           </Button>
         </div>
+
+        {progression.length >= 2 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-dim)]">
+            <span>Take this progression further:</span>
+            <Link
+              href={`/companion?tab=ideas&instrument=bass&prog=${encodeURIComponent(progression.map(chordLabel).join(" "))}`}
+              className="rounded-lg border border-[var(--color-hairline-bright)] px-2.5 py-1.5 hover:border-[var(--color-signal)]"
+            >
+              More bass ideas in Companion →
+            </Link>
+            <Link
+              href={`/companion?tab=loop&instrument=bass&prog=${encodeURIComponent(progression.map(chordLabel).join(" "))}`}
+              className="rounded-lg border border-[var(--color-hairline-bright)] px-2.5 py-1.5 hover:border-[var(--color-signal)]"
+            >
+              Record it in the Looper →
+            </Link>
+          </div>
+        )}
 
         <div className="mt-5 border-t border-[var(--color-hairline)] pt-4">
           <span className="hud-label mb-2 block">Difficulty</span>

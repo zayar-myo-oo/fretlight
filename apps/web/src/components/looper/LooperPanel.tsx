@@ -20,6 +20,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useLoopClock } from "@/hooks/useLooper";
 import { type AudioInputDevice, listInputs, watchDevices } from "@/lib/audio/audio-input";
 import type { LooperEngine, LooperState, TrackKind } from "@/lib/looper/looper-engine";
+import { type StoredSession, clearSession, loadSession, saveSession } from "@/lib/looper/session-store";
 import { cn } from "@/lib/ui/cn";
 import { useSession } from "@/store/session";
 
@@ -138,7 +139,10 @@ export function LooperPanel({
   board,
   lowStringOnTop,
   selectedChord,
+  active = true,
 }: {
+  /** False while another Companion tab is showing: keyboard shortcuts only apply when the looper is visible. */
+  active?: boolean;
   engine: LooperEngine;
   state: LooperState;
   progression: Progression;
@@ -158,6 +162,8 @@ export function LooperPanel({
   const [newKind, setNewKind] = useState<TrackKind>("rhythm");
   const [confirmClear, setConfirmClear] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [keep, setKeep] = useState(true);
+  const [restorable, setRestorable] = useState<StoredSession | null>(null);
 
   const { settings, phase, tracks, loopSeconds, bars, recording } = state;
   const hasLoop = tracks.length > 0 && loopSeconds !== null;
@@ -206,6 +212,67 @@ export function LooperPanel({
     if (!hasLoop) void engine.recordMaster(newKind, nameFor(newKind));
     else void engine.recordOverdub(newKind, nameFor(newKind));
   };
+
+  // A saved loop from last time, offered back instead of silently loaded.
+  useEffect(() => {
+    try {
+      setKeep(localStorage.getItem("fretlight.looper.keep") !== "0");
+    } catch {
+      // default: keep
+    }
+    void loadSession().then((saved) => {
+      if (saved && engine.getState().tracks.length === 0) setRestorable(saved);
+    });
+  }, [engine]);
+
+  // Save the loop on this device a moment after each change (never while recording).
+  const hadTracks = useRef(false);
+  useEffect(() => {
+    if (tracks.length > 0) hadTracks.current = true;
+    if (!keep || recordingNow) return;
+    const timer = setTimeout(() => {
+      const session = engine.exportSession();
+      if (session) void saveSession(session);
+      else if (hadTracks.current) void clearSession();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [tracks, keep, recordingNow, engine]);
+
+  const setKeepOnDevice = (value: boolean) => {
+    setKeep(value);
+    try {
+      localStorage.setItem("fretlight.looper.keep", value ? "1" : "0");
+    } catch {
+      // not remembered
+    }
+    if (!value) void clearSession();
+  };
+
+  // Space = play / pause, R = record / stop, Esc = stop. Never while typing in a field.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.code === "Space") {
+        if (!hasLoop || recordingNow || target?.tagName === "BUTTON") return;
+        event.preventDefault();
+        if (running) engine.pause();
+        else engine.startPlayback();
+      } else if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        if (recordingNow) {
+          if (phase === "recording" && recording?.master) void engine.stopMaster();
+          else engine.cancelRecording();
+        } else if (state.inputReady) startRecording();
+      } else if (event.key === "Escape") {
+        engine.stop();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const gateOptions: { value: GateLevel; label: string }[] = [
     { value: "off", label: "Off" },
@@ -288,6 +355,7 @@ export function LooperPanel({
         </Field>
       </div>
       <Toggle label="Metronome click while the loop plays" checked={settings.metronome} onChange={(v) => engine.configure({ metronome: v })} />
+      <Toggle label="Keep my loop on this device after a refresh (stored in this browser only)" checked={keep} onChange={setKeepOnDevice} />
     </div>
   );
 
@@ -374,6 +442,21 @@ export function LooperPanel({
             </p>
           )}
           {state.error && <p className="rounded-xl border border-[var(--color-error)] px-4 py-2.5 text-sm text-[var(--color-error)]">{state.error}</p>}
+
+          {restorable && tracks.length === 0 && !recordingNow && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-theory)] bg-[rgba(139,124,255,0.08)] px-4 py-3 text-sm">
+              <span className="min-w-[200px] flex-1">
+                Your last loop is saved on this device: {restorable.tracks.length} line{restorable.tracks.length === 1 ? "" : "s"}, {Math.round(restorable.bars)} bars at {restorable.bpm} BPM
+                ({new Date(restorable.savedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}).
+              </span>
+              <Button size="sm" variant="primary" onClick={() => { const saved = restorable; setRestorable(null); void engine.importSession(saved); }}>
+                Restore it
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setRestorable(null); void clearSession(); }}>
+                Discard
+              </Button>
+            </div>
+          )}
 
           {/* ----------------------------------------------------- 1: connect */}
           {stage === "connect" && (
@@ -478,6 +561,7 @@ export function LooperPanel({
                 </label>
                 <p className="text-xs text-[var(--color-ink-faint)]">It plays the loop, counts you in, and records one full loop.</p>
               </div>
+              <p className="text-[11px] text-[var(--color-ink-faint)]">Keys: Space play / pause · R record / stop · Esc stop</p>
             </div>
           )}
 
@@ -499,6 +583,19 @@ export function LooperPanel({
           title={`Lines (${tracks.length})`}
           meta={
             <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
+                Master
+                <input
+                  type="range"
+                  min={0}
+                  max={1.5}
+                  step={0.05}
+                  value={settings.masterVolume}
+                  onChange={(e) => engine.configure({ masterVolume: Number(e.target.value) })}
+                  aria-label="Master volume"
+                  className="w-24 accent-[var(--color-signal)]"
+                />
+              </label>
               <Button size="sm" onClick={() => { const bytes = engine.mixWav(1); if (bytes) download(bytes, "fretlight-mix.wav"); }}>
                 ↓ Download mix
               </Button>

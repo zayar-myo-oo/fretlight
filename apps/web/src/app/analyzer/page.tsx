@@ -128,22 +128,39 @@ export default function AnalyzerPage() {
   );
 
   // The first stretch of repeating chords, ready to hand to the Companion.
-  const companionLink = useMemo(() => {
-    if (!analysis) return null;
-    const names: string[] = [];
-    const take = (indexes: readonly number[]) => {
+  // Chord names of the first repeating stretch (or of one section), collapsed and spelled for the key.
+  const namesFor = useCallback(
+    (indexes: readonly number[]) => {
+      const names: string[] = [];
       for (const i of indexes) {
         const name = spellChord(chords[i]!, keyInfo);
         if (name && names[names.length - 1] !== name && names.length < 8) names.push(name);
       }
-    };
+      return names;
+    },
+    [chords, keyInfo],
+  );
+  const linkFor = useCallback(
+    (names: readonly string[], tab: "ideas" | "loop", practice = false) => {
+      if (!analysis || names.length < 2) return null;
+      const q = new URLSearchParams({ tab, prog: names.join(" "), instrument: analysis.instrument });
+      if (analysis.bpm && analysis.bpmConfidence >= 0.35) q.set("bpm", String(analysis.bpm));
+      if (practice) q.set("focus", "practice");
+      return `/companion?${q.toString()}`;
+    },
+    [analysis],
+  );
+  const songNames = useMemo(() => {
+    // The first section with a real progression in it; otherwise the whole song.
     for (const { rows } of chart) {
-      take(rows.flat().flatMap((bar) => bar.chordIndexes));
-      if (names.length >= 4) break;
+      const names = namesFor(rows.flat().flatMap((bar) => bar.chordIndexes));
+      if (names.length >= 2) return names;
     }
-    if (names.length < 2) take(chords.map((_, i) => i));
-    return names.length >= 2 ? `/companion?prog=${encodeURIComponent(names.join(" "))}&instrument=${analysis.instrument}` : null;
-  }, [analysis, chart, chords, keyInfo]);
+    return namesFor(chords.map((_, i) => i));
+  }, [chart, chords, namesFor]);
+  const companionLink = linkFor(songNames, "ideas");
+  const practiceLink = linkFor(songNames, "ideas", true);
+  const looperLink = linkFor(songNames, "loop");
 
   const activeChord = chordAt(chords, player.time);
   const activeSection = analysis ? sectionAt(analysis.sections, player.time) : -1;
@@ -232,14 +249,25 @@ export default function AnalyzerPage() {
               </div>
 
               {companionLink && (
-                <div>
-                  <Link
-                    href={companionLink}
-                    className="inline-flex h-10 items-center rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)] px-4 text-sm font-medium text-[var(--color-signal)] hover:bg-[rgba(34,224,214,0.18)]"
-                  >
-                    What can I play? →
-                  </Link>
-                  <span className="ml-3 text-xs text-[var(--color-ink-faint)]">Open the Companion with this progression</span>
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-[var(--color-ink-dim)]">
+                    Use <span className="readout text-[var(--color-ink)]">{songNames.join(" ")}</span> in the rest of Fretlight:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={companionLink} className="inline-flex h-10 items-center rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)] px-4 text-sm font-medium text-[var(--color-signal)] hover:bg-[rgba(34,224,214,0.18)]">
+                      What can I play? →
+                    </Link>
+                    {practiceLink && (
+                      <Link href={practiceLink} className="inline-flex h-10 items-center rounded-xl border border-[var(--color-hairline-bright)] px-4 text-sm hover:border-[var(--color-signal)]">
+                        Practice this progression →
+                      </Link>
+                    )}
+                    {looperLink && (
+                      <Link href={looperLink} className="inline-flex h-10 items-center rounded-xl border border-[var(--color-hairline-bright)] px-4 text-sm hover:border-[var(--color-signal)]">
+                        Send to Looper →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -299,6 +327,7 @@ export default function AnalyzerPage() {
             activeSection={activeSection}
             onSeek={(t) => player.seek(t, true)}
             onSelectChord={setSelected}
+            sectionLink={(index) => linkFor(namesFor(chart[index]?.rows.flat().flatMap((bar) => bar.chordIndexes) ?? []), "ideas", true)}
           />
 
           <ChordPanel

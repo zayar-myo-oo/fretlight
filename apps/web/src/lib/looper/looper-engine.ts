@@ -16,6 +16,7 @@ import {
   snapLoopSeconds,
 } from "@fretlight/core";
 import { MetronomeEngine } from "@/lib/audio/metronome-engine";
+import { type StoredSession, resample } from "./session-store";
 
 /**
  * The Companion looper.
@@ -31,7 +32,7 @@ import { MetronomeEngine } from "@/lib/audio/metronome-engine";
  * only ever held in memory here: nothing is uploaded, and nothing is stored.
  */
 
-export type TrackKind = "rhythm" | "lead" | "bass" | "melody" | "guitar" | "other";
+export type TrackKind = "rhythm" | "lead" | "bass" | "melody" | "guitar" | "vocals" | "percussion" | "other";
 export type Phase = "empty" | "counting" | "recording" | "playing" | "paused" | "stopped";
 
 export interface LooperTrack {
@@ -58,6 +59,8 @@ export interface LooperSettings {
   readonly monitor: boolean;
   readonly latencyMs: number;
   readonly deviceId: string;
+  /** Overall playback level, 0..1.5. */
+  readonly masterVolume: number;
 }
 
 export interface RecordingInfo {
@@ -110,7 +113,10 @@ const DEFAULTS: LooperSettings = {
   monitor: false,
   latencyMs: 40,
   deviceId: "",
+  masterVolume: 1,
 };
+
+const MAX_FIRST_TAKE_SECONDS = 300;
 
 let nextId = 1;
 const newId = () => `track-${nextId++}`;
@@ -194,6 +200,7 @@ export class LooperEngine {
     const settings: LooperSettings = { ...this.state.settings, ...patch, ...(locked ? { bpm, beatsPerBar, loopMode } : {}) };
     this.set({ settings });
     this.applyInputSettings();
+    if (this.master && this.context) this.master.gain.setTargetAtTime(settings.masterVolume, this.context.currentTime, 0.02);
     if (patch.metronome !== undefined && this.state.phase === "playing") {
       if (settings.metronome && settings.loopMode === "musical") {
         this.metronome?.stop();
@@ -239,6 +246,7 @@ export class LooperEngine {
     if (!this.context) {
       this.context = new AudioContext({ latencyHint: "interactive" });
       this.master = this.context.createGain();
+      this.master.gain.value = this.state.settings.masterVolume;
       this.master.connect(this.context.destination);
       this.metronome = new MetronomeEngine({
         bpm: this.state.settings.bpm,
@@ -255,6 +263,14 @@ export class LooperEngine {
 
   /** Open an input device. Must come from a click (browsers require a gesture for audio). */
   async enableInput(deviceId = this.state.settings.deviceId): Promise<void> {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      this.set({ error: "Recording needs a secure (https) page. Open Fretlight from its https address." });
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof AudioWorkletNode === "undefined") {
+      this.set({ error: "This browser cannot record audio. Try a current Chrome, Edge, Firefox or Safari." });
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -440,8 +456,17 @@ export class LooperEngine {
     const startFrame = Math.round(startsAt * context.sampleRate);
     const pending = this.beginTake(startFrame, null, null);
     this.masterTake = { pending, startsAt, kind, name };
+    // A forgotten Stop should not fill memory: five minutes is the longest first line.
+    clearTimeout(this.maxTimer);
+    this.maxTimer = setTimeout(() => {
+      if (this.masterTake?.pending === pending) {
+        this.set({ error: "Stopped at 5 minutes, the longest a first line can be." });
+        void this.stopMaster();
+      }
+    }, (startsAt - context.currentTime + MAX_FIRST_TAKE_SECONDS) * 1000);
   }
 
+  private maxTimer: ReturnType<typeof setTimeout> | undefined;
   private masterTake: { pending: Promise<Float32Array>; startsAt: number; kind: TrackKind; name: string } | null = null;
 
   /** Stop the first line: this is the moment the loop length is decided. */
@@ -570,7 +595,12 @@ export class LooperEngine {
   startPlayback(anchor?: number): void {
     const context = this.context;
     const { loopSeconds, tracks, settings } = this.state;
-    if (!context || !loopSeconds || tracks.length === 0) return;
+    if (!loopSeconds || tracks.length === 0) return;
+    if (!context) {
+      // A restored session has no audio context yet; make one (this runs from a click) and try again.
+      void this.ensureContext().then(() => this.startPlayback(anchor));
+      return;
+    }
     if (this.state.phase === "playing" && anchor === undefined) return;
 
     const when = context.currentTime + 0.06;
@@ -819,6 +849,48 @@ export class LooperEngine {
     const length = tracks[0]!.samples.length;
     const mix = mixTracks(audible.map((t) => ({ samples: t.samples, volume: t.volume })), length);
     return encodeWav(repeats > 1 ? repeatLoop(mix, repeats) : mix, this.sampleRate);
+  }
+
+  // ------------------------------------------------------------ persistence
+
+  /** Everything needed to rebuild the loop later, or null when there is no loop. */
+  exportSession(): StoredSession | null {
+    const { tracks, loopSeconds, bars, settings } = this.state;
+    if (!loopSeconds || tracks.length === 0) return null;
+    return {
+      savedAt: Date.now(),
+      sampleRate: this.sampleRate,
+      loopSeconds,
+      bars: bars ?? 1,
+      bpm: settings.bpm,
+      beatsPerBar: settings.beatsPerBar,
+      loopMode: settings.loopMode,
+      tracks: tracks.map((t) => ({ name: t.name, kind: t.kind, volume: t.volume, muted: t.muted, solo: t.solo, samples: t.samples })),
+    };
+  }
+
+  /** Bring back a saved loop. Called from a click, so the audio context may start. */
+  async importSession(session: StoredSession): Promise<void> {
+    const context = await this.ensureContext();
+    this.stopSources();
+    const rate = context.sampleRate;
+    const tracks = session.tracks.map((t) => {
+      const samples = resample(t.samples, session.sampleRate, rate);
+      return { ...this.makeTrack(t.name, t.kind as TrackKind, samples), volume: t.volume, muted: t.muted, solo: t.solo };
+    });
+    const length = tracks[0]!.samples.length;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.pausedAt = 0;
+    this.set({
+      tracks,
+      loopSeconds: length / rate,
+      bars: session.bars,
+      phase: "stopped",
+      recording: null,
+      settings: { ...this.state.settings, bpm: session.bpm, beatsPerBar: session.beatsPerBar, loopMode: session.loopMode },
+    });
+    this.rebuildBuffers();
   }
 
   dispose(): void {

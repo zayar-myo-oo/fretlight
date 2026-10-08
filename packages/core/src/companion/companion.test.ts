@@ -261,3 +261,12 @@ describe("tab", () => {
     expect(ideaTab(guitar, idea!)).toHaveLength(6);
   });
 });
+
+describe("chord names from other parts of the app", () => {
+  it("reads the symbols the Bassline and Analyzer produce", () => {
+    for (const symbol of ["Bm7b5", "Cdim7", "Am6", "G9", "Fmaj9", "Dm9", "C#m", "Ebmaj7", "Gsus2", "Cadd9", "E5"]) {
+      expect(parseChordSymbol(symbol), symbol).not.toBeNull();
+    }
+    expect(parseChordSymbol("Bm7b5")).toMatchObject({ root: 11, quality: "dim" });
+  });
+});

@@ -4,6 +4,7 @@ import {
   type AccuracyBreakdown,
   type Drill,
   PracticeEngine,
+  SHARP_NAMES,
   describeTarget,
   generateDrill,
   type EvaluationEvent,
@@ -75,6 +76,8 @@ export default function PracticePage() {
   const metronome = useMetronome();
 
   const [kind, setKind] = useState<ExerciseKind>("note");
+  // Notes to focus on, when Progress sent the player here to work on weak spots.
+  const [focusNotes, setFocusNotes] = useState<number[] | null>(null);
   const [drillSeed, setDrillSeed] = useState(1);
   const [drillLength, setDrillLength] = useState(10);
   const [positionIndex, setPositionIndex] = useState(0);
@@ -132,9 +135,22 @@ export default function PracticePage() {
       length: drillLength,
       seed: drillSeed,
       root: scale.root,
+      ...(kind === "note" && focusNotes ? { pool: focusNotes } : {}),
       ...(kind === "fret" ? { fretRange: [0, Math.min(12, board.fretCount)] as const } : {}),
     });
-  }, [kind, board, drillLength, drillSeed, scale.root]);
+  }, [kind, board, drillLength, drillSeed, scale.root, focusNotes]);
+
+  // Links from Progress (and elsewhere) can preselect the exercise, the notes and the tempo.
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const requested = query.get("kind");
+    if (requested && ["note", "fret", "interval", "scale", "position", "arpeggio"].includes(requested)) setKind(requested as ExerciseKind);
+    const notes = (query.get("notes") ?? "").split(",").filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 12);
+    if (notes.length) setFocusNotes(notes);
+    const tempo = Number(query.get("bpm"));
+    if (tempo >= 40 && tempo <= 240) patch({ bpm: tempo });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mode = timed && !drill ? "timed" : "free";
 
@@ -412,6 +428,17 @@ export default function PracticePage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {focusNotes && kind === "note" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-theory)] bg-[rgba(139,124,255,0.08)] px-4 py-3 text-sm">
+          <span>
+            Focused on <span className="readout font-semibold">{focusNotes.map((pc) => SHARP_NAMES[pc]).join(", ")}</span>, your weakest notes in Progress.
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => setFocusNotes(null)}>
+            Practise all notes
+          </Button>
+        </div>
+      )}
+
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{sequence.name}</h1>

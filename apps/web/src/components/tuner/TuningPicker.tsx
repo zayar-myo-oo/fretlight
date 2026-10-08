@@ -6,10 +6,11 @@ import { useMounted } from "@/hooks/useMounted";
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
 
-const CATEGORY_ORDER: readonly TuningCategory[] = ["standard", "drop"];
+const CATEGORY_ORDER: readonly TuningCategory[] = ["standard", "drop", "open"];
 const CATEGORY_LABELS: Record<TuningCategory, string> = {
   standard: "Standard",
   drop: "Drop",
+  open: "Open",
   custom: "Custom",
 };
 

@@ -22,7 +22,10 @@ const SUFFIXES: readonly [string, ChordQuality][] = [
   ["aug", "aug"], ["+", "aug"],
   ["major", "maj"], ["Maj", "maj"], ["maj", "maj"], ["M", "maj"],
   ["minor", "min"], ["min", "min"], ["mi", "min"], ["m", "min"], ["-", "min"],
-  ["7", "7"], ["dom7", "7"],
+  ["7", "7"], ["dom7", "7"], ["9", "7"], ["13", "7"],
+  // Close relatives this engine has no separate template for: read as the chord they are built on.
+  ["maj9", "maj7"], ["m9", "m7"], ["m7b5", "dim"], ["ø", "dim"], ["ø7", "dim"], ["dim7", "dim"], ["°7", "dim"],
+  ["m6", "min"], ["mMaj7", "min"], ["mmaj7", "min"], ["7sus4", "sus4"],
   ["5", "maj"], ["6", "maj"],
   ["", "maj"],
 ];

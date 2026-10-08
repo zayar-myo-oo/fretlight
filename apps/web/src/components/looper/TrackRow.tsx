@@ -11,10 +11,12 @@ export const KIND_LABELS: Record<TrackKind, string> = {
   bass: "Bass",
   melody: "Melody",
   guitar: "Guitar",
+  vocals: "Vocals",
+  percussion: "Percussion",
   other: "Other",
 };
 
-const KIND_ICON: Record<TrackKind, string> = { rhythm: "🎸", lead: "🎸", bass: "🎵", melody: "🎶", guitar: "🎸", other: "🎙" };
+const KIND_ICON: Record<TrackKind, string> = { rhythm: "🎸", lead: "🎸", bass: "🎵", melody: "🎶", guitar: "🎸", vocals: "🎤", percussion: "🥁", other: "🎙" };
 
 interface Props {
   readonly track: LooperTrack;

@@ -21,6 +21,7 @@ const GUITAR_STEPS: readonly Step[] = [
   { view: "fills", title: "Add a short fill", learn: "Fill the gap before a chord change with a few notes that start on the current chord and land on the next chord's target.", cta: "Try a fill" },
   { view: "lead", title: "Build a melody", learn: "Chain chord tones through every chord, joined by passing notes. This is the lead-guitar idea: land on triad notes instead of running up and down a scale.", cta: "Build a melody" },
   { view: "practice", title: "Practice over the loop", learn: "Let the progression repeat and improvise with the triad lit up. When it feels easy, switch on the fill, then take the highlights away.", cta: "Go to practice" },
+  { view: "looper", title: "Record yourself", learn: "Record the chords in the Looper, then play the triads, targets and fills over your own loop. Add a bass line on top.", cta: "Open the Looper" },
 ];
 
 const BASS_STEPS: readonly Step[] = [
@@ -30,6 +31,7 @@ const BASS_STEPS: readonly Step[] = [
   { view: "bass-approach", title: "Lead into the next chord", learn: "A note a half step from the next root pulls the ear toward it. It is the simplest fill there is.", cta: "Try approach notes" },
   { view: "bass-walking", title: "Walk through the chords", learn: "Four even notes a bar that climb or fall through the chord and arrive on the next root.", cta: "Try walking bass" },
   { view: "practice", title: "Practice over the loop", learn: "Play along with the progression on repeat, and turn on the bass fill once the basic line feels solid.", cta: "Go to practice" },
+  { view: "looper", title: "Record a bass line", learn: "Record a guitar loop (or ask a bandmate), then add your bass line on top in the Looper.", cta: "Open the Looper" },
 ];
 
 const KEY = "fretlight.companion.guideHidden";

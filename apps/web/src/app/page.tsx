@@ -1,16 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { INSTRUMENTS, getInstrument, tuningsFor } from "@fretlight/core";
-import { AppIntro } from "@/components/intro/AppIntro";
-import { Badge } from "@/components/ui/Badge";
+import { INSTRUMENTS, getInstrument, recommendations, tuningsFor } from "@fretlight/core";
+import { useMemo } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { Stat } from "@/components/ui/Stat";
-import { useMounted } from "@/hooks/useMounted";
-import { useSession } from "@/store/session";
-import { summarise, useProgress } from "@/store/progress";
-import { cn } from "@/lib/ui/cn";
 import { NAV_ITEMS } from "@/components/layout/nav";
+import { useMounted } from "@/hooks/useMounted";
+import { cn } from "@/lib/ui/cn";
+import { summarise, useProgress } from "@/store/progress";
+import { useSession } from "@/store/session";
+import { useWeakAreas } from "@/store/weak-areas";
+
+/** The six things people come to Fretlight to do, each pointing at the one place that does it. */
+const INTENTS = [
+  { href: "/tuner", icon: "🎚", title: "Tune my instrument", text: "Get in tune before anything else." },
+  { href: "/practice", icon: "🎯", title: "Practise", text: "Short drills that listen and score you." },
+  { href: "/companion?tab=ideas", icon: "💡", title: "I don't know what to play", text: "Type the chords; get fills, melodies and bass lines that fit." },
+  { href: "/companion?tab=loop", icon: "🔁", title: "Play over a loop", text: "Record your chords, loop them, and play on top." },
+  { href: "/analyzer", icon: "🎵", title: "Learn a song", text: "Load a song file to get its chords, key and sections." },
+  { href: "/fretboard", icon: "🧭", title: "Understand the fretboard", text: "Scales, chords and what each note does." },
+] as const;
 
 export default function HomePage() {
   const mounted = useMounted();
@@ -19,168 +29,141 @@ export default function HomePage() {
   const setInstrument = useSession((s) => s.setInstrument);
   const setTuning = useSession((s) => s.setTuning);
   const records = useProgress((s) => s.records);
+  const notes = useWeakAreas((s) => s.notes);
 
   const instrument = getInstrument(instrumentId);
   const tunings = instrument ? tuningsFor(instrument.kind, instrument.stringCount) : [];
   const summary = summarise(records);
+  const next = useMemo(() => (mounted ? recommendations(records, notes)[0] ?? null : null), [mounted, records, notes]);
 
   return (
     <div className="flex flex-col gap-6">
       <section className="animate-rise">
-        <Badge tone="signal" className="mb-4">
-          Guitar & bass practice companion
-        </Badge>
-        <h1 className="text-gradient max-w-3xl text-4xl leading-[1.08] font-semibold tracking-tight md:text-6xl">
-          Play. It listens, understands and shows you where you are.
+        <h1 className="text-gradient max-w-3xl text-4xl leading-[1.08] font-semibold tracking-tight md:text-5xl">
+          What do you want to do?
         </h1>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-dim)] md:text-base">
-          Tune up, learn scales and chords, and practise with live feedback. Everything runs
-          on this device: no account, and your audio never leaves it.
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-dim)] md:text-base">
+          Fretlight is a practice companion for guitar and bass. It listens to you play, shows you where the notes are,
+          and explains why they work. Everything runs on this device; your audio is never uploaded.
         </p>
       </section>
 
-      <AppIntro />
-
-      <Panel title="Choose your instrument">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {INSTRUMENTS.map((option) => {
-            const active = mounted && option.id === instrumentId;
-            return (
-              <button
-                key={option.id}
-                onClick={() => setInstrument(option.id)}
-                className={cn(
-                  "group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all duration-200",
-                  active
-                    ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.08)] glow-signal"
-                    : "border-[var(--color-hairline)] bg-[var(--color-void)] hover:border-[var(--color-hairline-bright)] hover:bg-[var(--color-panel-raised)]",
-                )}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <span className="text-sm font-semibold">{option.name}</span>
-                  <span className="readout text-[10px] text-[var(--color-ink-faint)]">
-                    {option.stringCount} str
-                  </span>
-                </div>
-                <span className="text-xs text-[var(--color-ink-faint)]">{option.description}</span>
-                <span className="readout mt-1 text-[10px] tracking-wider text-[var(--color-ink-faint)] uppercase">
-                  detection range {option.minFrequency}–{option.maxFrequency} Hz
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {mounted && tunings.length > 0 && (
-          <div className="mt-5 border-t border-[var(--color-hairline)] pt-4">
-            <h3 className="hud-label mb-3">Tuning</h3>
-            <div className="flex flex-wrap gap-2">
-              {tunings.map((tuning) => {
-                const active = tuning.id === tuningId;
-                return (
-                  <button
-                    key={tuning.id}
-                    onClick={() => setTuning(tuning.id)}
-                    className={cn(
-                      "flex flex-col items-start gap-0.5 rounded-xl border px-3.5 py-2 transition-all",
-                      active
-                        ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)]"
-                        : "border-[var(--color-hairline)] hover:border-[var(--color-hairline-bright)]",
-                    )}
-                  >
-                    <span className="text-xs font-medium">{tuning.name}</span>
-                    <span className="readout text-[10px] text-[var(--color-ink-faint)]">
-                      {tuning.strings.join(" ")}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </Panel>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {INTENTS.map((intent) => (
+          <Link
+            key={intent.href}
+            href={intent.href}
+            className="group flex items-start gap-3 rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-panel)] p-4 transition-all hover:border-[var(--color-signal)] hover:bg-[var(--color-panel-raised)] focus-visible:outline-2 focus-visible:outline-[var(--color-signal)]"
+          >
+            <span aria-hidden className="text-2xl leading-none">{intent.icon}</span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-base font-semibold">{intent.title} <span className="text-[var(--color-ink-faint)] group-hover:text-[var(--color-signal)]">→</span></span>
+              <span className="text-xs leading-relaxed text-[var(--color-ink-faint)]">{intent.text}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <Panel title="Where to start">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {NAV_ITEMS.filter((item) => item.href !== "/").map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group flex items-center gap-3 rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-4 transition-all hover:border-[var(--color-hairline-bright)] hover:bg-[var(--color-panel-raised)]"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel)] text-[var(--color-signal)] transition-colors group-hover:border-[var(--color-signal)]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={item.icon} />
-                  </svg>
-                </span>
-                <span className="flex flex-col">
-                  <span className="text-sm font-medium">{item.label}</span>
-                  <span className="text-xs text-[var(--color-ink-faint)]">{item.hint}</span>
-                </span>
-              </Link>
-            ))}
+        <Panel title="Your instrument" meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Used everywhere: tuner, fretboard, tabs, practice</span>}>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {INSTRUMENTS.map((option) => {
+              const active = mounted && option.id === instrumentId;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => setInstrument(option.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-left transition-all",
+                    active
+                      ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.08)]"
+                      : "border-[var(--color-hairline)] bg-[var(--color-void)] hover:border-[var(--color-hairline-bright)]",
+                  )}
+                >
+                  <span className="text-sm font-medium">{option.name}</span>
+                  <span className="readout text-[10px] text-[var(--color-ink-faint)]">{option.stringCount} strings</span>
+                </button>
+              );
+            })}
           </div>
+
+          {mounted && tunings.length > 0 && (
+            <div className="mt-4 border-t border-[var(--color-hairline)] pt-4">
+              <h3 className="hud-label mb-2.5">Tuning</h3>
+              <div className="flex flex-wrap gap-2">
+                {tunings.map((tuning) => {
+                  const active = tuning.id === tuningId;
+                  return (
+                    <button
+                      key={tuning.id}
+                      onClick={() => setTuning(tuning.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        "flex flex-col items-start gap-0.5 rounded-xl border px-3 py-1.5 transition-all",
+                        active ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)]" : "border-[var(--color-hairline)] hover:border-[var(--color-hairline-bright)]",
+                      )}
+                    >
+                      <span className="text-xs font-medium">{tuning.name}</span>
+                      <span className="readout text-[10px] text-[var(--color-ink-faint)]">{tuning.strings.join(" ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Panel>
 
         <Panel
           title="Your progress"
           meta={
-            <>
-              <Badge tone="neutral">stored on device</Badge>
-              <Link href="/progress" className="hud-label text-[var(--color-signal)] hover:underline">
-                View all →
-              </Link>
-            </>
+            <Link href="/progress" className="hud-label text-[var(--color-signal)] hover:underline">
+              See all →
+            </Link>
           }
         >
           {!mounted ? (
             <div className="h-24" />
           ) : summary.sessions === 0 ? (
             <p className="text-sm leading-relaxed text-[var(--color-ink-faint)]">
-              No sessions yet. Finish a run in the practice trainer and it will be recorded
-              here — locally, with nothing uploaded.
+              No practice yet. Finish one drill in Practice and your progress starts here. It stays on this device.
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-5">
               <Stat label="Sessions" value={summary.sessions} />
               <Stat label="Practice time" value={summary.totalMinutes} unit="min" />
-              <Stat
-                label="Avg accuracy"
-                value={`${Math.round(summary.averageAccuracy * 100)}%`}
-                tone="signal"
-              />
+              <Stat label="Avg accuracy" value={`${Math.round(summary.averageAccuracy * 100)}%`} tone="signal" />
               <Stat label="Streak" value={summary.streakDays} unit="days" tone="correct" />
             </div>
+          )}
+          {next && (
+            <Link href={next.href} className="mt-4 block rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.06)] p-3 hover:bg-[rgba(34,224,214,0.12)]">
+              <span className="hud-label block">Next step</span>
+              <span className="text-sm font-semibold">{next.title} →</span>
+              <span className="mt-0.5 block text-xs text-[var(--color-ink-dim)]">{next.detail}</span>
+            </Link>
           )}
         </Panel>
       </div>
 
-      <Panel title="Capability levels">
-        <div className="grid gap-3 md:grid-cols-4">
-          {[
-            { level: "Level 1", title: "Microphone", detail: "Tuner, note detection, scale practice", state: "Phase 2" },
-            { level: "Level 2", title: "+ Camera", detail: "Hand tracking, fretboard detection", state: "Phase 5" },
-            { level: "Level 3", title: "+ GPU", detail: "3D holographic fretboard", state: "Phase 6" },
-            { level: "Level 4", title: "+ Cloud AI", detail: "Tutor, plans, analysis — optional", state: "Phase 7" },
-          ].map((item, index) => (
-            <div
-              key={item.level}
-              className="rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-4"
+      <Panel title="All tools">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {NAV_ITEMS.filter((item) => item.href !== "/").map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group flex min-w-0 items-center gap-3 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] px-3 py-2.5 transition-all hover:border-[var(--color-hairline-bright)] hover:bg-[var(--color-panel-raised)]"
             >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="hud-label">{item.level}</span>
-                <Badge tone={index === 0 ? "signal" : "neutral"}>{item.state}</Badge>
-              </div>
-              <p className="text-sm font-medium">{item.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--color-ink-faint)]">{item.detail}</p>
-            </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-signal)]" aria-hidden>
+                <path d={item.icon} />
+              </svg>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-medium">{item.label}</span>
+                <span className="truncate text-[11px] text-[var(--color-ink-faint)]">{item.hint}</span>
+              </span>
+            </Link>
           ))}
         </div>
-        <p className="mt-4 text-xs leading-relaxed text-[var(--color-ink-faint)]">
-          Each level degrades to the one below it. Nothing in levels 1–3 needs the network,
-          and level 4 never sits in the real-time path.
-        </p>
       </Panel>
     </div>
   );
