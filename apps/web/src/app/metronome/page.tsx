@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Slider } from "@/components/ui/Slider";
+import { SpeedTrainer } from "@/components/metronome/SpeedTrainer";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useMetronome } from "@/hooks/useMetronome";
 import { useMounted } from "@/hooks/useMounted";
@@ -144,6 +145,8 @@ export default function MetronomePage() {
           </div>
         </div>
       </Panel>
+
+      <SpeedTrainer beat={beat} running={isRunning} />
 
       <div className="grid gap-6 md:grid-cols-3">
         <Panel title="Time signature">

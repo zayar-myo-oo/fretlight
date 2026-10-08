@@ -74,3 +74,29 @@ Audited against the code in this repository. "Done" means it exists in the repos
 - Keyboard: Tab reaches every button with a visible focus ring. In the Looper, Space / R / M / S / Esc are ignored while typing in a field.
 - Settings → Delete asks for confirmation and removes only that store.
 - Open: screen-reader pass with NVDA and VoiceOver; a real-device recording test.
+
+## 6. Premium feature matrix (audit, round 3)
+
+| Area | Status | Notes |
+|---|---|---|
+| A. Tuner | Partial | Chromatic, string-by-string, input device, alternate tunings incl. DADGAD (added). No left-handed mode. No A4 calibration UI to check. |
+| B. Metronome | Partial | BPM, tap, time signatures, subdivisions, accent, visual beat. **Speed trainer (tempo ramp) added.** It ramps by time, not by measured success. |
+| C. Fretboard | Partial | Notes/intervals/degrees, scales, chords, triads, note inspector, sound. Missing: capo, left-handed, CAGED. |
+| D. Chord library | Partial | 16 chord types in core; Fretboard chord mode; Cowboy shapes. Missing: multiple voicings per chord and a dedicated library page. |
+| E. Chord trainer | Missing | Live chord detection exists (Listen); a scored chord-change drill does not. |
+| F. Scales | Existing | 13 scales incl. modes, harmonic/melodic minor. |
+| G. CAGED | Missing | |
+| H. Triads | Existing | Inversions, playback, link to lead. |
+| I. Arpeggios | Partial | `getArpeggio` in core, used by Practice drills. |
+| J. Ear training | **Added** | Intervals and chord types, 3 levels, weak spots stored locally. Note, scale, key and rhythm recognition still missing. |
+| K–L. Rhythm / strumming | Partial | Style rhythm patterns with ↓↑ arrows, Hear. No scored rhythm trainer. |
+| M–N. TAB / TAB player | Partial | Generated, validated TAB text; no technique notation, seek or speed player. |
+| O–R. Song / Analyzer / chord & key detection | Existing | Local decode, BPM, chroma, Viterbi smoothing, key with alternative, sections, confidence, correction. |
+| S–X. Companion, fills, lead, melody, bass | Existing | "What should I play?" Safe/Melodic/Interesting, fills 1 beat–2 bars, lead/counter, 9 bass types, transpose. Missing: riff generator, position-aware fills. |
+| Y. Jam mode | Existing | Looper "What can I play now?" follows the playing loop. |
+| Z–AA. Looper and noise control | Existing | Multi-track, one clock, gate, compressor, meter, clipping, monitor, M/S/R/Space/Esc. |
+| AB–AE. Practice, improvisation, call & response, sight reading | Partial | Note/scale/position drills with scoring; the others are missing. |
+| AH–AJ. Favorites, routines, recommendations | Partial | Saved Companion ideas; recommendations from real data. No custom routines. |
+| AK. Skill tree | Partial | Skill map from real data; says "not enough data" honestly. |
+| AL–AO. Transpose, capo, left-handed, custom tuning | Partial | Transpose and custom tuning exist; no capo or left-handed mode. |
+| AP–AQ. Theory lessons, learning path | Missing | |

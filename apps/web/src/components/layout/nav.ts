@@ -82,6 +82,13 @@ export const NAV_ITEMS: readonly NavItem[
     mobilePrimary: true,
   },
   {
+    href: "/ear",
+    group: "practice",
+    label: "Ear Training",
+    hint: "Name intervals and chord types by ear",
+    icon: "M8 18a3 3 0 0 0 3-3c0-2 3-3 3-6a5 5 0 1 0-10 0M14 9a2 2 0 1 0-4 0",
+  },
+  {
     href: "/analyzer",
     group: "practice",
     label: "Analyzer",

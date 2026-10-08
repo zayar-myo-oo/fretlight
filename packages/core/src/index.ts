@@ -57,6 +57,7 @@ export * from "./practice/scoring";
 export * from "./practice/drills";
 export * from "./practice/bassline";
 export * from "./practice/insights";
+export * from "./practice/ear-training";
 
 // Song / backing-track architecture
 export * from "./song/types";

@@ -27,6 +27,7 @@ export const TUNINGS: readonly TuningDefinition[] = [
   { id: "guitar-6-d",         name: "D Standard",        instrument: "guitar", stringCount: 6, strings: ["D2", "G2", "C3", "F3", "A3", "D4"], category: "standard", note: "Everything a whole step lower" },
   { id: "guitar-6-open-g",    name: "Open G",            instrument: "guitar", stringCount: 6, strings: ["D2", "G2", "D3", "G3", "B3", "D4"], category: "open", note: "Strum open for a G major chord" },
   { id: "guitar-6-open-d",    name: "Open D",            instrument: "guitar", stringCount: 6, strings: ["D2", "A2", "D3", "F#3", "A3", "D4"], category: "open", note: "Strum open for a D major chord" },
+  { id: "guitar-6-dadgad",     name: "DADGAD",            instrument: "guitar", stringCount: 6, strings: ["D2", "A2", "D3", "G3", "A3", "D4"], category: "open", note: "Celtic and folk tuning: an open Dsus4 sound" },
   { id: "guitar-7-standard",  name: "7-String Standard", instrument: "guitar", stringCount: 7, strings: ["B1", "E2", "A2", "D3", "G3", "B3", "E4"], isStandard: true, category: "standard" },
 
   // ---- Bass ----
