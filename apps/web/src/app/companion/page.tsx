@@ -22,6 +22,7 @@ import { useSearchParams } from "next/navigation";
 import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { IdeaView } from "@/components/companion/IdeaView";
 import { LearningGuide } from "@/components/companion/LearningGuide";
+import { LooperPanel } from "@/components/looper/LooperPanel";
 import { SoundMenu } from "@/components/fretboard/SoundMenu";
 import { Button } from "@/components/ui/Button";
 import { PracticePanel } from "@/components/companion/PracticePanel";
@@ -192,6 +193,16 @@ function Companion() {
           setDifficulty(value);
           setVariant(0);
         }}
+      />
+
+      <LooperPanel
+        progression={progression}
+        style={style}
+        difficulty={difficulty}
+        instrument={instrument}
+        board={board}
+        lowStringOnTop={lowStringOnTop}
+        selectedChord={chosen}
       />
 
       <LiveChordPanel

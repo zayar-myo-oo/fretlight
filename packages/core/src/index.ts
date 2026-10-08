@@ -21,6 +21,7 @@ export * from "./theory/harmonic-function";
 export * from "./theory/key-detection";
 export * from "./song-analysis";
 export * from "./companion";
+export * from "./looper/loop-math";
 
 // Instrument
 export * from "./instrument/tunings";

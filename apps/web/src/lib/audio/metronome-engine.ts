@@ -84,10 +84,22 @@ export class MetronomeEngine {
     if (this.master) this.master.gain.value = this.volume;
   }
 
-  async start(): Promise<void> {
+  /**
+   * Use an AudioContext the caller already owns, so clicks sit on the same sample
+   * clock as whatever else the caller schedules (the looper records and plays on it).
+   */
+  attach(context: AudioContext, destination: AudioNode = context.destination): void {
+    this.context = context;
+    this.master = context.createGain();
+    this.master.gain.value = this.volume;
+    this.master.connect(destination);
+  }
+
+  /** Start clicking. `anchor` is the audio-clock time of beat zero; it may be in the past to keep an existing grid. */
+  async start(anchor?: number): Promise<void> {
     if (this.running) return;
     const context = await this.ensureContext();
-    this.startTime = context.currentTime + 0.08; // small pad so the first click is not clipped
+    this.startTime = anchor ?? context.currentTime + 0.08; // small pad so the first click is not clipped
     this.scheduledUntil = context.currentTime;
     this.running = true;
     this.schedule();
