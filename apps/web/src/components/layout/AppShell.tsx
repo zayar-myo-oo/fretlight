@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="stack flex min-h-dvh flex-col md:flex-row">
       {/* Desktop rail */}
-      <nav className="sticky top-0 z-30 hidden h-dvh w-[76px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-[var(--color-hairline)] bg-[rgba(8,12,20,0.72)] py-5 backdrop-blur-xl md:flex">
+      <nav className="sticky top-0 z-30 hidden h-dvh w-[76px] shrink-0 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r border-[var(--color-hairline)] bg-[rgba(8,12,20,0.72)] py-5 backdrop-blur-xl md:flex">
         <Link href="/" className="mb-5 flex flex-col items-center gap-1.5" aria-label="Fretlight home">
           <Mark />
         </Link>

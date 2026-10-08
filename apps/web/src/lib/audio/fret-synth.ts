@@ -1,4 +1,5 @@
 import { getInstrument, midiToFrequency, renderPluck } from "@fretlight/core";
+import { Soundfont } from "smplr";
 import { useSession } from "@/store/session";
 
 /**
@@ -30,11 +31,13 @@ export interface SoundPreset {
   readonly drive: number;
   readonly filters: readonly FilterStep[];
   readonly level: number;
+  /** General MIDI instrument recorded in the sample library; played instead of the model once loaded. */
+  readonly sample: string;
 }
 
 export const SOUND_PRESETS: readonly SoundPreset[] = [
   {
-    id: "acoustic", label: "Acoustic guitar", kind: "guitar",
+    id: "acoustic", sample: "acoustic_guitar_steel", label: "Acoustic guitar", kind: "guitar",
     sustain: 2.4, brightness: 0.6, position: 0.13, drive: 0, level: 1,
     filters: [
       { type: "highpass", freq: 80 },
@@ -44,7 +47,7 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     ],
   },
   {
-    id: "nylon", label: "Classical (nylon)", kind: "guitar",
+    id: "nylon", sample: "acoustic_guitar_nylon", label: "Classical (nylon)", kind: "guitar",
     sustain: 2.0, brightness: 0.3, position: 0.2, drive: 0, level: 1.1,
     filters: [
       { type: "highpass", freq: 70 },
@@ -53,7 +56,7 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     ],
   },
   {
-    id: "clean", label: "Electric (clean)", kind: "guitar",
+    id: "clean", sample: "electric_guitar_clean", label: "Electric (clean)", kind: "guitar",
     sustain: 3.2, brightness: 0.5, position: 0.17, drive: 0, level: 1,
     filters: [
       { type: "highpass", freq: 60 },
@@ -62,7 +65,7 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     ],
   },
   {
-    id: "overdrive", label: "Electric (overdrive)", kind: "guitar",
+    id: "overdrive", sample: "overdriven_guitar", label: "Electric (overdrive)", kind: "guitar",
     sustain: 4.0, brightness: 0.65, position: 0.12, drive: 6, level: 0.55,
     filters: [
       { type: "highpass", freq: 90 },
@@ -71,7 +74,7 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     ],
   },
   {
-    id: "bass-finger", label: "Bass (fingers)", kind: "bass",
+    id: "bass-finger", sample: "electric_bass_finger", label: "Bass (fingers)", kind: "bass",
     sustain: 3.4, brightness: 0.25, position: 0.25, drive: 0, level: 1.3,
     filters: [
       { type: "highpass", freq: 28 },
@@ -80,7 +83,7 @@ export const SOUND_PRESETS: readonly SoundPreset[] = [
     ],
   },
   {
-    id: "bass-pick", label: "Bass (pick)", kind: "bass",
+    id: "bass-pick", sample: "electric_bass_pick", label: "Bass (pick)", kind: "bass",
     sustain: 3.0, brightness: 0.6, position: 0.1, drive: 0, level: 1.1,
     filters: [
       { type: "highpass", freq: 28 },
@@ -137,6 +140,8 @@ export class FretSynth {
   private chosen: string | null = null;
   private volume = 0.7;
   private loaded = false;
+  private samplers = new Map<string, { player: Soundfont; ready: boolean }>();
+  private stops = new Set<(time?: number) => void>();
 
   /** Subscribe to preset / volume changes (for useSyncExternalStore). */
   subscribe = (listener: () => void): (() => void) => {
@@ -214,6 +219,8 @@ export class FretSynth {
       }
     }
     this.active.clear();
+    for (const stop of this.stops) stop();
+    this.stops.clear();
   }
 
   dispose(): void {
@@ -221,6 +228,7 @@ export class FretSynth {
     this.context = null;
     this.master = null;
     this.buffers.clear();
+    this.samplers.clear();
   }
 
   /**
@@ -231,6 +239,17 @@ export class FretSynth {
   async pluck(midi: number, preset: SoundPreset = this.getPreset(), options: PluckOptions = {}): Promise<void> {
     const context = await this.ensureContext();
     const now = options.at ?? context.currentTime + (options.when ?? 0);
+
+    // Recorded guitar/bass samples once they have downloaded; the modelled string until then (or offline).
+    const sampler = this.samplerFor(context, preset);
+    if (sampler.ready) {
+      const velocity = Math.round(Math.max(1, Math.min(127, 96 * (options.gain ?? 1))));
+      const stop = sampler.player.start({ note: midi, time: now, velocity, ...(options.mute ? { duration: 0.12 } : {}) });
+      this.stops.add(stop);
+      setTimeout(() => this.stops.delete(stop), Math.max(0, (now - context.currentTime) * 1000) + 8000);
+      return;
+    }
+
     const buffer = this.bufferFor(context, preset, midi);
 
     const source = context.createBufferSource();
@@ -278,6 +297,40 @@ export class FretSynth {
     if (options.mute) source.stop(now + 0.2);
   }
 
+  /** One sample player per sound, created on first use and loaded in the background. */
+  private samplerFor(context: AudioContext, preset: SoundPreset): { player: Soundfont; ready: boolean } {
+    let entry = this.samplers.get(preset.id);
+    if (!entry) {
+      const created: { player: Soundfont; ready: boolean } = {
+        player: new Soundfont(context, { kit: "MusyngKite", instrument: preset.sample, destination: this.master! }),
+        ready: false,
+      };
+      created.player.load.then(
+        () => {
+          created.ready = true;
+        },
+        () => {
+          // No network: keep using the modelled string for this sound.
+        },
+      );
+      this.samplers.set(preset.id, created);
+      entry = created;
+    }
+    return entry;
+  }
+
+  /**
+   * Start downloading the samples for a sound (or wait up to `timeoutMs` for
+   * them), so the first notes of a phrase already use the recorded instrument.
+   */
+  async preload(preset: SoundPreset = this.getPreset(), timeoutMs = 4000): Promise<boolean> {
+    const context = await this.ensureContext();
+    const entry = this.samplerFor(context, preset);
+    if (entry.ready) return true;
+    await Promise.race([entry.player.load.catch(() => null), new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
+    return entry.ready;
+  }
+
   private bufferFor(context: AudioContext, preset: SoundPreset, midi: number): AudioBuffer {
     const key = `${preset.id}:${midi}`;
     let buffer = this.buffers.get(key);
@@ -305,7 +358,12 @@ export class FretSynth {
    */
   async warm(items: readonly { midi: number; preset?: SoundPreset }[]): Promise<number> {
     const context = await this.ensureContext();
-    for (const item of items) this.bufferFor(context, item.preset ?? this.getPreset(), item.midi);
+    const presets = new Set(items.map((item) => item.preset ?? this.getPreset()));
+    for (const preset of presets) await this.preload(preset, 2500);
+    for (const item of items) {
+      const preset = item.preset ?? this.getPreset();
+      if (!this.samplers.get(preset.id)?.ready) this.bufferFor(context, preset, item.midi);
+    }
     return context.currentTime;
   }
 
