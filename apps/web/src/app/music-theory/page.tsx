@@ -14,6 +14,7 @@ import {
 } from "@fretlight/core";
 import { useMemo, useRef, useState } from "react";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
+import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { NotePicker } from "@/components/ui/NotePicker";
@@ -351,16 +352,7 @@ export default function MusicTheoryPage() {
             />
           </Panel>
 
-          <Panel title="Live Chord Detection" meta={<Badge tone="theory">Coming soon</Badge>}>
-            <p className="text-xs leading-relaxed text-[var(--color-ink-dim)]">
-              Play a chord on your guitar or bass and see its name and key context. Planned
-              pipeline: microphone → Web Audio → chroma → chord match → stabilised result,
-              all on-device. The matching and debouncing logic already exists in the theory
-              core (<span className="readout">matchChord</span>,{" "}
-              <span className="readout">ChordStabilizer</span>); only the audio-input stage is
-              missing.
-            </p>
-          </Panel>
+          <LiveChordPanel activeKey={activeKey} />
         </div>
 
         <div className="flex flex-col gap-6">
