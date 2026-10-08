@@ -36,6 +36,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     mobilePrimary: true,
   },
   {
+    href: "/music-theory",
+    label: "Music Theory",
+    hint: "Find the key, scale and chords from notes",
+    icon: "M12 3v12m0 0a3 3 0 1 1-3-3h3Zm0-12 6 3M5 20h14",
+  },
+  {
     href: "/metronome",
     label: "Metronome",
     hint: "Tempo and rhythm",

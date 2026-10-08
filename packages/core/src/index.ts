@@ -18,6 +18,7 @@ export * from "./theory/scales";
 export * from "./theory/chords";
 export * from "./theory/arpeggio";
 export * from "./theory/harmonic-function";
+export * from "./theory/key-detection";
 
 // Instrument
 export * from "./instrument/tunings";
