@@ -22,6 +22,7 @@ import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { IdeaView } from "@/components/companion/IdeaView";
 import { LearningGuide } from "@/components/companion/LearningGuide";
 import { PracticePanel } from "@/components/companion/PracticePanel";
+import { QuickIdeas } from "@/components/companion/QuickIdeas";
 import { ProgressionPanel } from "@/components/companion/ProgressionPanel";
 import { SavedIdeas } from "@/components/companion/SavedIdeas";
 import { ChordTonesView, CowboyView, TriadsView } from "@/components/companion/TheoryViews";
@@ -79,7 +80,7 @@ function Companion() {
 
   const [tab, setTab] = useState<Tab>(() => {
     const requested = params.get("tab");
-    return isTab(requested) ? requested : params.get("prog") ? "ideas" : "loop";
+    return isTab(requested) ? requested : "ideas";
   });
   const [text, setText] = useState(params.get("prog") || "C G Am F");
   // The instrument is app-wide (Home, Tuner, Fretboard all share it), not a Companion-only setting.
@@ -288,6 +289,19 @@ function Companion() {
 
       {tab === "ideas" && (
         <div className="flex flex-col gap-6">
+          <QuickIdeas
+            board={board}
+            progression={progression}
+            selected={chosen}
+            instrument={instrument}
+            style={style}
+            bpm={sessionBpm}
+            lowStringOnTop={lowStringOnTop}
+            onLooper={() => { setTab("loop"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            onPractice={() => goGuide("practice")}
+            onMore={() => document.getElementById("ideas-views")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          />
+
           <LearningGuide instrument={instrument} active={activeView} visited={visited} onGo={goGuide} />
 
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] px-4 py-3 text-sm">

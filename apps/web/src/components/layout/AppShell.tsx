@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { getInstrument } from "@fretlight/core";
 import { useSession } from "@/store/session";
 import { useCalibration } from "@/hooks/useCalibration";
@@ -12,7 +12,7 @@ import { resolveTuning } from "@/lib/tuning/resolve-tuning";
 import { cn } from "@/lib/ui/cn";
 import { useHtmlLang, useT, type MessageKey } from "@/lib/i18n/locale";
 import { LanguageSwitch } from "./LanguageSwitch";
-import { NAV_ITEMS, type NavItem } from "./nav";
+import { NAV_GROUPS, NAV_ITEMS, type NavItem } from "./nav";
 
 const label = (item: NavItem) => `nav.${item.href}` as MessageKey;
 const hint = (item: NavItem) => `nav.${item.href}.hint` as MessageKey;
@@ -31,13 +31,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="stack flex min-h-dvh flex-col md:flex-row">
       {/* Desktop rail */}
-      <nav className="sticky top-0 z-30 hidden h-dvh w-[76px] shrink-0 flex-col items-center gap-1 border-r border-[var(--color-hairline)] bg-[rgba(8,12,20,0.72)] py-5 backdrop-blur-xl md:flex">
+      <nav className="sticky top-0 z-30 hidden h-dvh w-[76px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-[var(--color-hairline)] bg-[rgba(8,12,20,0.72)] py-5 backdrop-blur-xl md:flex">
         <Link href="/" className="mb-5 flex flex-col items-center gap-1.5" aria-label="Fretlight home">
           <Mark />
         </Link>
-        {NAV_ITEMS.map((item) => (
-          <RailLink key={item.href} item={item} active={isActive(pathname, item.href)} />
-        ))}
+        <RailGroups pathname={pathname} />
         <div className="mt-auto">
           <ListeningDot />
         </div>
@@ -85,14 +83,17 @@ function MobileTabBar({ pathname }: { pathname: string }) {
           />
           <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 rounded-2xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.4)] md:hidden">
             <div className="grid grid-cols-2 gap-1.5">
-              {overflow.map((item) => {
+              {overflow.map((item, i) => {
                 const active = isActive(pathname, item.href);
+                const heading = item.group !== overflow[i - 1]?.group;
                 return (
+                  <Fragment key={item.href}>
+                  {heading && <p className="hud-label col-span-2 px-3 pt-1.5">{t(`nav.group.${item.group}` as MessageKey)}</p>}
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors",
+                      "flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors",
                       active
                         ? "bg-[rgba(34,224,214,0.12)] text-[var(--color-signal)]"
                         : "text-[var(--color-ink-dim)] hover:bg-[rgba(255,255,255,0.04)]",
@@ -101,6 +102,7 @@ function MobileTabBar({ pathname }: { pathname: string }) {
                     <Icon path={item.icon} />
                     <span className="text-xs font-medium">{t(label(item))}</span>
                   </Link>
+                  </Fragment>
                 );
               })}
             </div>
@@ -138,6 +140,31 @@ function MobileTabBar({ pathname }: { pathname: string }) {
           <span className="text-[9px] tracking-wider uppercase">{t("nav.more")}</span>
         </button>
       </nav>
+    </>
+  );
+}
+
+/** The desktop rail, split into goal groups (Learn / Play / Practice / Progress) with a short label each. */
+function RailGroups({ pathname }: { pathname: string }) {
+  const t = useT();
+  return (
+    <>
+      {NAV_GROUPS.map((group) => {
+        const items = NAV_ITEMS.filter((item) => item.group === group);
+        if (items.length === 0) return null;
+        return (
+          <div key={group} className={cn("flex flex-col items-center gap-1", group === "settings" && "mt-auto")}>
+            {group !== "home" && group !== "settings" && (
+              <span className="mt-2 w-full border-t border-[var(--color-hairline)] pt-1.5 text-center text-[8px] tracking-[0.14em] text-[var(--color-ink-faint)] uppercase">
+                {t(`nav.group.${group}` as MessageKey)}
+              </span>
+            )}
+            {items.map((item) => (
+              <RailLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+            ))}
+          </div>
+        );
+      })}
     </>
   );
 }

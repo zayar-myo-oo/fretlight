@@ -8,6 +8,7 @@ import {
   type Progression,
   STYLE_IDS,
   STYLE_PROFILES,
+  transposeProgressionText,
 } from "@fretlight/core";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
@@ -59,7 +60,13 @@ export function ProgressionPanel({
             placeholder="C | G | Am | F"
             className="h-11 w-full rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-3 text-base text-[var(--color-ink)]"
           />
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="flex items-center gap-1" role="group" aria-label={x("Transpose")}>
+              <button onClick={() => onText(transposeProgressionText(text, -1))} aria-label={x("Transpose down a half step")} className="readout h-8 min-w-8 rounded-lg border border-[var(--color-hairline-bright)] px-2 text-xs hover:border-[var(--color-signal)]">−½</button>
+              <span className="hud-label">{x("Transpose")}</span>
+              <button onClick={() => onText(transposeProgressionText(text, 1))} aria-label={x("Transpose up a half step")} className="readout h-8 min-w-8 rounded-lg border border-[var(--color-hairline-bright)] px-2 text-xs hover:border-[var(--color-signal)]">+½</button>
+            </span>
+            <span className="mx-1 h-5 w-px bg-[var(--color-hairline)]" />
             {PRESETS.map((preset) => (
               <button
                 key={preset}

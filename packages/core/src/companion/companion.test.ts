@@ -270,3 +270,14 @@ describe("chord names from other parts of the app", () => {
     expect(parseChordSymbol("Bm7b5")).toMatchObject({ root: 11, quality: "dim" });
   });
 });
+
+describe("transposeProgressionText", () => {
+  it("moves roots and slash basses, keeping qualities and separators", async () => {
+    const { transposeProgressionText } = await import("./transpose");
+    expect(transposeProgressionText("C G Am F", 2)).toBe("D A Bm G");
+    expect(transposeProgressionText("C | G/B | Am7 | Fmaj7", 2)).toBe("D | A/Db | Bm7 | Gmaj7");
+    expect(transposeProgressionText("Bbmaj7 Ebadd9", 1)).toBe("Bmaj7 Eadd9");
+    expect(transposeProgressionText("E", -1)).toBe("Eb");
+    expect(transposeProgressionText("C G", 12)).toBe("C G");
+  });
+});

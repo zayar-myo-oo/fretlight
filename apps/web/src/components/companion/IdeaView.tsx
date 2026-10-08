@@ -249,6 +249,11 @@ export function IdeaView({
           <div>
             <p className="hud-label mb-1.5">{x("Tab")}</p>
             <pre className="readout overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-xs leading-relaxed">{tab.join("\n")}</pre>
+            {idea.pattern?.[1] && (
+              <p className="readout mt-2 text-2xl tracking-[0.35em] text-[var(--color-signal)]" aria-label={x("Strum pattern")}>
+                {idea.pattern[1].replace(/D/g, "↓").replace(/U/g, "↑").replace(/M/g, "×").replace(/S/g, "↓").replace(/A/g, "•")}
+              </p>
+            )}
             {idea.pattern && (
               <pre className="readout mt-2 overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-xs leading-relaxed">{idea.pattern.map((line) => x(line)).join("\n")}</pre>
             )}

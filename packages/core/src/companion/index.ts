@@ -5,6 +5,7 @@ export * from "./triads";
 export * from "./cowboy";
 export * from "./styles";
 export { type GenContext, leadRange, bassRange, counterRange, degreeWord, chordAtBeat } from "./melody-engine";
+export { transposeProgressionText } from "./transpose";
 export * from "./placement";
 export * from "./tab";
 export * from "./ideas";

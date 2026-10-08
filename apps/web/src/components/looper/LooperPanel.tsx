@@ -271,6 +271,12 @@ export function LooperPanel({
         } else if (state.inputReady) startRecording();
       } else if (event.key === "Escape") {
         engine.stop();
+      } else if ((event.key === "m" || event.key === "M" || event.key === "s" || event.key === "S") && tracks.length > 0) {
+        // M / S act on the newest line, the one you most likely just recorded.
+        const last = tracks[tracks.length - 1]!;
+        event.preventDefault();
+        if (event.key.toLowerCase() === "m") engine.setMuted(last.id, !last.muted);
+        else engine.setSolo(last.id, !last.solo);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -573,7 +579,7 @@ export function LooperPanel({
                 </label>
                 <p className="text-xs text-[var(--color-ink-faint)]">{x("It plays the loop, counts you in, and records one full loop.")}</p>
               </div>
-              <p className="text-[11px] text-[var(--color-ink-faint)]">{x("Keys: Space play / pause · R record / stop · Esc stop")}</p>
+              <p className="text-[11px] text-[var(--color-ink-faint)]">{x("Keys: Space play / pause · R record / stop · M mute / S solo newest line · Esc stop")}</p>
             </div>
           )}
 

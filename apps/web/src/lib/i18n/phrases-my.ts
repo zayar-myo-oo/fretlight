@@ -25,6 +25,57 @@ const deg = (word: string) => DEGREE[word] ?? word;
 const and = (list: string) => list.replace(/ and /g, " နဲ့ ");
 
 export const PHRASES_MY: Record<string, string> = {
+  // ---------------------------------------------------------------- quick ideas
+  "No progression yet.": "ကော့ဒ်အစဉ် မရှိသေးပါ။",
+  "Enter chords like C G Am F to get playable ideas.": "တီးလို့ရတဲ့ အိုင်ဒီယာတွေ ရဖို့ C G Am F လို ကော့ဒ်တွေ ရိုက်ထည့်ပါ။",
+  "What should I play?": "ဘာတီးရမလဲ?",
+  "⟳ Ask again for this chord": "⟳ ဒီကော့ဒ်အတွက် ထပ်မေး",
+  "Tap a chord above to choose which change to work on.": "ဘယ်ကော့ဒ်ပြောင်းတာကို လေ့ကျင့်မလဲ ရွေးဖို့ အပေါ်က ကော့ဒ်ကို နှိပ်ပါ။",
+  Suggestions: "အကြံပြုချက်များ",
+  SAFE: "စိတ်ချရ",
+  MELODIC: "သံစဉ်လှ",
+  INTERESTING: "စိတ်ဝင်စားစရာ",
+  "Can't go wrong: chord tones only, few notes.": "မမှားနိုင်ဘူး — ကော့ဒ်နုတ်တွေပဲ၊ နုတ်နည်းနည်း။",
+  "A short line that leads into the next chord.": "နောက်ကော့ဒ်ဆီ ဦးဆောင်တဲ့ လိုင်းတိုလေး။",
+  "More notes and colour. Try it once the safe one feels easy.": "နုတ်ပိုများပြီး အရောင်ပိုစုံ။ စိတ်ချရတဲ့ဟာ လွယ်လာမှ စမ်းပါ။",
+  "▶ Hear": "▶ နားထောင်",
+  "🐢 Slow": "🐢 ဖြည်းဖြည်း",
+  "Practice it": "လေ့ကျင့်မယ်",
+  "Play it over a loop →": "Loop ပေါ်မှာ တီးမယ် →",
+  "Why does this sound good?": "ဘာလို့ နားထောင်လို့ကောင်းတာလဲ?",
+  "Avoid: holding a note that is not in {chord} on beat 1 of the new chord. It will clash with the band.":
+    "ရှောင်ရန်: ကော့ဒ်အသစ်ရဲ့ beat 1 မှာ {chord} ထဲမပါတဲ့ နုတ်ကို ဖိမထားပါနဲ့။ Band နဲ့ ထိခိုက်သံ ဖြစ်မယ်။",
+  "More options: triads, melodies, rhythm, cowboy chords ↓": "နောက်ထပ်ရွေးချယ်စရာ: triad၊ melody၊ rhythm၊ cowboy ကော့ဒ် ↓",
+  Transpose: "Key ပြောင်း",
+  "Transpose down a half step": "Half step တစ်ဆင့် နိမ့်",
+  "Transpose up a half step": "Half step တစ်ဆင့် မြင့်",
+  "Strum pattern": "ခတ်ပုံ",
+
+  // ---------------------------------------------------------------- settings
+  "These apply everywhere: Tuner, Fretboard, Companion, Looper and Practice. Everything is stored on this device only.":
+    "ဒါတွေက နေရာတိုင်းမှာ သက်ရောက်တယ် — Tuner၊ ဖရက်ဘုတ်၊ Companion၊ Looper နဲ့ Practice။ အားလုံး ဒီစက်ထဲမှာပဲ သိမ်းတယ်။",
+  "Instrument and tuning": "တူရိယာနဲ့ ကြိုးညှိပုံ",
+  Display: "ပြသပုံ",
+  Language: "ဘာသာစကား",
+  "Fretboard labels": "ဖရက်ဘုတ် စာတန်း",
+  "Note names": "နုတ်နာမည်",
+  "Scale degrees": "Scale degree",
+  Intervals: "Interval",
+  "Fretboard orientation": "ဖရက်ဘုတ် အနေအထား",
+  "Low string at the bottom": "အနိမ့်ကြိုး အောက်မှာ",
+  "Low string on top": "အနိမ့်ကြိုး အပေါ်မှာ",
+  "Tuner chime when in tune": "ကြိုးညီရင် အသံမြည်",
+  Sound: "အသံ",
+  "The sound used when you tap a note or press Play.": "နုတ်နှိပ်တာ ဒါမှမဟုတ် Play နှိပ်တဲ့အခါ သုံးတဲ့အသံ။",
+  "Your data": "သင့်ဒေတာ",
+  "Practice history, saved ideas and your last loop are kept in this browser. Nothing is uploaded. Deleting cannot be undone.":
+    "လေ့ကျင့်မှုမှတ်တမ်း၊ သိမ်းထားတဲ့ အိုင်ဒီယာနဲ့ နောက်ဆုံး loop တွေကို ဒီ browser ထဲမှာ သိမ်းထားတယ်။ ဘာမှ upload မလုပ်ပါ။ ဖျက်ရင် ပြန်ယူလို့ မရပါ။",
+  "Practice history and weak spots": "လေ့ကျင့်မှုမှတ်တမ်းနဲ့ အားနည်းချက်များ",
+  "Saved Companion ideas": "သိမ်းထားတဲ့ Companion အိုင်ဒီယာများ",
+  "Saved loop": "သိမ်းထားတဲ့ loop",
+  "Yes, delete": "ဟုတ်ကဲ့၊ ဖျက်",
+  "Deleted from this device.": "ဒီစက်ထဲက ဖျက်ပြီးပါပြီ။",
+
   // ---------------------------------------------------------------- page
   "Guitar & Bass Companion": "ဂစ်တာ & ဘေ့စ် အဖော်",
   "Type the chords your band is playing, then practise over a loop, get ideas that fit, or let the app listen.":
@@ -328,7 +379,7 @@ export const PHRASES_MY: Record<string, string> = {
   "● Record a new line": "● လိုင်းအသစ် အသံသွင်း",
   "Line type": "လိုင်းအမျိုးအစား",
   "It plays the loop, counts you in, and records one full loop.": "Loop ကို ဖွင့်၊ count-in လုပ်ပြီး loop တစ်ပတ်လုံး အသံသွင်းမယ်။",
-  "Keys: Space play / pause · R record / stop · Esc stop": "ခလုတ်: Space ဖွင့်/ခဏရပ် · R အသံသွင်း/ရပ် · Esc ရပ်",
+  "Keys: Space play / pause · R record / stop · M mute / S solo newest line · Esc stop": "ခလုတ်: Space ဖွင့်/ခဏရပ် · R အသံသွင်း/ရပ် · M/S နောက်ဆုံးလိုင်း mute/solo · Esc ရပ်",
   Settings: "ဆက်တင်",
   Input: "Input",
   "not connected yet": "မချိတ်ရသေး",
