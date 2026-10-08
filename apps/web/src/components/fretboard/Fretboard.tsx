@@ -1,7 +1,7 @@
 "use client";
 
 import { type Fretboard as FretboardModel, noteAt } from "@fretlight/core";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { TONE_STYLES, type MarkerTone } from "@/lib/ui/tone";
 import { cn } from "@/lib/ui/cn";
 import { buildGeometry, stringThickness, type GeometryOptions } from "./geometry";
@@ -89,6 +89,12 @@ export function Fretboard({
     [fromFret, lastFret],
   );
 
+  // Each fretboard needs its own gradient ids: with shared ids the browser resolves
+  // url(#…) to the first copy on the page, and when that copy is hidden the
+  // neck, frets and strings of every other fretboard stop painting.
+  const uid = useId().replace(/:/g, "");
+  const ref = (name: string) => `${name}-${uid}`;
+
   const markerIndex = useMemo(() => {
     const map = new Map<string, FretMarker>();
     for (const marker of markers) map.set(`${marker.string}:${marker.fret}`, marker);
@@ -116,22 +122,22 @@ export function Fretboard({
       aria-label={`${board.tuning.name} fretboard, ${board.stringCount} strings`}
     >
       <defs>
-        <linearGradient id="neck-wood" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={ref("neck-wood")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#141c2b" />
           <stop offset="45%" stopColor="#0d1421" />
           <stop offset="100%" stopColor="#080d17" />
         </linearGradient>
-        <linearGradient id="fret-wire" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={ref("fret-wire")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#5c6a83" />
           <stop offset="50%" stopColor="#9fb0cc" />
           <stop offset="100%" stopColor="#4a5670" />
         </linearGradient>
-        <linearGradient id="string-metal" x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id={ref("string-metal")} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#8c9ab5" />
           <stop offset="50%" stopColor="#c3d0e6" />
-          <stop offset="100%" stopColor="#7b8aa" />
+          <stop offset="100%" stopColor="#7b8aaa" />
         </linearGradient>
-        <filter id="marker-glow" x="-80%" y="-80%" width="260%" height="260%">
+        <filter id={ref("marker-glow")} x="-80%" y="-80%" width="260%" height="260%">
           <feGaussianBlur stdDeviation="5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -147,7 +153,7 @@ export function Fretboard({
         width={geometry.fretX(lastFret) - geometry.nutX}
         height={geometry.neckBottom - geometry.neckTop + 32}
         rx={6}
-        fill="url(#neck-wood)"
+        fill={`url(#${ref("neck-wood")})`}
         stroke="#1e2839"
       />
 
@@ -211,7 +217,7 @@ export function Fretboard({
             width={isNut ? 8 : 2.5}
             height={geometry.neckBottom - geometry.neckTop + 32}
             rx={isNut ? 3 : 1}
-            fill={isNut ? "#d6dff0" : "url(#fret-wire)"}
+            fill={isNut ? "#d6dff0" : `url(#${ref("fret-wire")})`}
             opacity={isNut ? 0.92 : 0.65}
           />
         );
@@ -225,7 +231,7 @@ export function Fretboard({
           y={geometry.stringY(stringIndex) - stringThickness(stringIndex, board.stringCount) / 2}
           width={geometry.fretX(lastFret) - geometry.nutX + 34}
           height={stringThickness(stringIndex, board.stringCount)}
-          fill="url(#string-metal)"
+          fill={`url(#${ref("string-metal")})`}
           opacity={0.55}
         />
       ))}
@@ -320,7 +326,7 @@ export function Fretboard({
             style={marker.emphasis ? { transformOrigin: `${x}px ${y}px` } : undefined}
           >
             {marker.emphasis && style.glow && (
-              <circle cx={x} cy={y} r={radius} fill={style.glow} opacity={0.5} filter="url(#marker-glow)">
+              <circle cx={x} cy={y} r={radius} fill={style.glow} opacity={0.5} filter={`url(#${ref("marker-glow")})`}>
                 <animate
                   attributeName="r"
                   values={`${radius};${radius * 1.9};${radius}`}
