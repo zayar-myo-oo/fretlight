@@ -9,7 +9,6 @@ import {
   STYLE_IDS,
   STYLE_PROFILES,
 } from "@fretlight/core";
-import { Badge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cn } from "@/lib/ui/cn";
@@ -45,7 +44,7 @@ export function ProgressionPanel({
   const profile = STYLE_PROFILES[style];
 
   return (
-    <Panel title="1 · Your progression" meta={<Badge tone="theory">built in the browser</Badge>}>
+    <Panel title="Your progression">
       <div className="flex flex-col gap-5">
         <div>
           <label className="hud-label mb-1.5 block" htmlFor="progression">
@@ -150,8 +149,7 @@ export function ProgressionPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-[var(--color-ink-faint)]">
-          <span className="text-[var(--color-ink-dim)]">{profile.label}:</span> {profile.blurb} A generic style vocabulary
-          ({profile.vocabulary.join(", ")}), not a copy of any song. {DIFFICULTY_INFO[difficulty]}
+          <span className="text-[var(--color-ink-dim)]">{profile.label}:</span> {profile.blurb} {DIFFICULTY_INFO[difficulty]}
         </p>
       </div>
     </Panel>

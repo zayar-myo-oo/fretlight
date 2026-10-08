@@ -42,6 +42,8 @@ export const TrackRow = memo(function TrackRow(p: Props) {
   const lane = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<{ a: number; b: number } | null>(null);
   const dragging = useRef<number | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     const el = canvas.current;
@@ -134,19 +136,32 @@ export const TrackRow = memo(function TrackRow(p: Props) {
           />
           <span className="readout w-9 text-right text-[11px] text-[var(--color-ink-faint)]">{Math.round(track.volume * 100)}%</span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="relative flex flex-wrap items-center gap-1.5">
           <Button size="sm" onClick={p.onRerecord} disabled={p.busy}>
-            ● Re-record
+            ● Record again
           </Button>
-          <Button size="sm" variant="ghost" onClick={p.onDuplicate} disabled={p.busy}>
-            Duplicate
+          <Button size="sm" variant="ghost" onClick={() => { setMenu((v) => !v); setConfirmDelete(false); }} aria-expanded={menu} aria-label="More actions">
+            ⋯ More
           </Button>
-          <Button size="sm" variant="ghost" onClick={p.onDownload}>
-            ↓ WAV
-          </Button>
-          <Button size="sm" variant="ghost" onClick={p.onDelete} disabled={p.busy}>
-            Delete
-          </Button>
+          {menu && (
+            <div className="absolute top-full left-0 z-20 mt-1 flex w-44 flex-col gap-0.5 rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] p-1.5 shadow-lg">
+              <button className="rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-[rgba(255,255,255,0.06)]" onClick={() => { p.onDownload(); setMenu(false); }}>
+                ↓ Download WAV
+              </button>
+              <button className="rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-40" disabled={p.busy} onClick={() => { p.onDuplicate(); setMenu(false); }}>
+                Duplicate
+              </button>
+              {confirmDelete ? (
+                <button className="rounded-lg bg-[rgba(255,84,112,0.16)] px-2.5 py-1.5 text-left text-xs text-[var(--color-error)]" onClick={() => { p.onDelete(); setMenu(false); }}>
+                  Yes, delete this line
+                </button>
+              ) : (
+                <button className="rounded-lg px-2.5 py-1.5 text-left text-xs text-[var(--color-error)] hover:bg-[rgba(255,84,112,0.1)] disabled:opacity-40" disabled={p.busy} onClick={() => setConfirmDelete(true)}>
+                  Delete…
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
