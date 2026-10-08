@@ -16,7 +16,13 @@ import { voice } from "./theory-player";
  * the audio clock (`when`), so timing stays tight however busy the page is, and
  * `stopCompanion()` silences it instantly. Sound only starts from a click.
  */
-const CHORD_PRESET: SoundPreset = SOUND_PRESETS.find((p) => p.id === "acoustic")!;
+const ACOUSTIC: SoundPreset = SOUND_PRESETS.find((p) => p.id === "acoustic")!;
+
+/** Chords use the guitar sound the player chose, or an acoustic one when a bass sound is selected. */
+export function chordPreset(): SoundPreset {
+  const chosen = fretSynth.getPreset();
+  return chosen.kind === "guitar" ? chosen : ACOUSTIC;
+}
 
 export interface PlayEvent {
   readonly at: number;
@@ -37,7 +43,7 @@ export function chordVoicing(chord: ProgressionChord, board?: Fretboard): number
 
 /** A strummed chord: low string first, a few milliseconds apart. */
 function strum(chord: ProgressionChord, at: number, board: Fretboard | undefined, gain: number): PlayEvent[] {
-  return chordVoicing(chord, board).map((midi, i) => ({ at: at + i * 0.018, midi, preset: CHORD_PRESET, gain }));
+  return chordVoicing(chord, board).map((midi, i) => ({ at: at + i * 0.018, midi, preset: chordPreset(), gain }));
 }
 
 export function beatsToSeconds(beats: number, bpm: number): number {

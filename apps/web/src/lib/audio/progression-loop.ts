@@ -1,8 +1,6 @@
 import { type Fretboard, type Idea, type Progression } from "@fretlight/core";
-import { type PlayEvent, beatsToSeconds, chordVoicing, ideaEvents } from "./companion-player";
-import { SOUND_PRESETS, fretSynth } from "./fret-synth";
-
-const CHORD_PRESET = SOUND_PRESETS.find((p) => p.id === "acoustic")!;
+import { type PlayEvent, beatsToSeconds, chordPreset, chordVoicing, ideaEvents } from "./companion-player";
+import { fretSynth } from "./fret-synth";
 
 export interface LoopOptions {
   readonly progression: Progression;
@@ -38,7 +36,7 @@ export class ProgressionLoop {
       for (const chord of progression.chords) {
         const at = beatsToSeconds(chord.startBeat, bpm);
         chordVoicing(chord, options.board).forEach((midi, i) =>
-          events.push({ at: at + i * 0.018, midi, preset: CHORD_PRESET, gain: 0.7 }),
+          events.push({ at: at + i * 0.018, midi, preset: chordPreset(), gain: 0.7 }),
         );
       }
       for (const idea of options.ideas ?? []) events.push(...ideaEvents(idea, bpm, 0));

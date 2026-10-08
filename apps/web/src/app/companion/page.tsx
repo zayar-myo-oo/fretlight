@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ChordMatch,
   BASS_CATEGORIES,
   CATEGORY_LABELS,
   type CompanionStyle,
@@ -16,9 +17,13 @@ import {
   spellPitchClass,
   targetNotes,
 } from "@fretlight/core";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { IdeaView } from "@/components/companion/IdeaView";
+import { LearningGuide } from "@/components/companion/LearningGuide";
+import { SoundMenu } from "@/components/fretboard/SoundMenu";
+import { Button } from "@/components/ui/Button";
 import { PracticePanel } from "@/components/companion/PracticePanel";
 import { ProgressionPanel } from "@/components/companion/ProgressionPanel";
 import { SavedIdeas } from "@/components/companion/SavedIdeas";
@@ -73,6 +78,12 @@ function Companion() {
   const [variant, setVariant] = useState(0);
   const [fillBeats, setFillBeats] = useState(2);
   const [saved, setSaved] = useState<SavedIdea[]>([]);
+  const [heard, setHeard] = useState<string[]>([]);
+  const [follow, setFollow] = useState(false);
+  const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
+  const heardRef = useRef<string[]>([]);
+  const followRef = useRef(follow);
+  followRef.current = follow;
 
   useEffect(() => setSaved(loadSavedIdeas()), []);
   useEffect(() => () => stopCompanion(), []);
@@ -96,6 +107,30 @@ function Companion() {
     [board, progression, instrument, style, difficulty],
   );
 
+  useEffect(() => setVisited((v) => new Set(v).add(activeView)), [activeView]);
+
+  // A chord heard through the microphone or interface joins the list; with "follow" on it becomes the progression.
+  const onHeard = useCallback((match: ChordMatch) => {
+    const list = heardRef.current;
+    if (list[list.length - 1] === match.symbol) return;
+    heardRef.current = [...list, match.symbol].slice(-16);
+    setHeard(heardRef.current);
+    if (followRef.current) {
+      setText(heardRef.current.slice(-4).join(" "));
+      setVariant(0);
+    }
+  }, []);
+
+  const goGuide = (target: string) => {
+    if (target === "practice") {
+      setVisited((v) => new Set(v).add("practice"));
+      document.getElementById("practice")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    choose(target as View);
+    setTimeout(() => document.getElementById("ideas")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+
   const choose = (next: View) => {
     stopCompanion();
     setView(next);
@@ -118,13 +153,18 @@ function Companion() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Guitar &amp; Bass Companion</h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Guitar &amp; Bass Companion</h1>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">
           Your bandmate is playing a progression. Type it in and get ideas that fit: which notes are strong, why they work,
           where they should land, and exactly where to play them.
-        </p>
+          </p>
+        </div>
+        <SoundMenu />
       </header>
+
+      <LearningGuide instrument={instrument} active={activeView} visited={visited} onGo={goGuide} />
 
       <ProgressionPanel
         text={text}
@@ -154,6 +194,53 @@ function Companion() {
         }}
       />
 
+      <LiveChordPanel
+        title="Or listen to your band"
+        activeKey={progression.key.key}
+        onChord={onHeard}
+        footer={
+          <div className="flex flex-col gap-3 border-t border-[var(--color-hairline)] pt-4">
+            <p className="hud-label">Chords heard</p>
+            {heard.length === 0 ? (
+              <p className="text-xs text-[var(--color-ink-faint)]">
+                Start listening and play or hum along; each new chord is added here. Then use them as the progression for ideas.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {heard.map((symbol, i) => (
+                  <span key={`-`} className="readout rounded-lg border border-[var(--color-hairline)] bg-[var(--color-void)] px-2.5 py-1 text-sm">
+                    {symbol}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="primary" disabled={heard.length === 0} onClick={() => setText(heard.slice(-4).join(" "))}>
+                Use last 4 as progression
+              </Button>
+              <Button size="sm" disabled={heard.length === 0} onClick={() => setText(heard.slice(-8).join(" "))}>
+                Use last 8
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={heard.length === 0}
+                onClick={() => {
+                  heardRef.current = [];
+                  setHeard([]);
+                }}
+              >
+                Clear
+              </Button>
+              <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-[var(--color-ink-dim)]">
+                <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-[var(--color-signal)]" />
+                Follow live: always use the last 4 chords
+              </label>
+            </div>
+          </div>
+        }
+      />
+
       {current && (
         <Panel title="How it fits together">
           <div className="flex flex-wrap items-stretch gap-1.5">
@@ -174,6 +261,7 @@ function Companion() {
         </Panel>
       )}
 
+      <div id="ideas" className="scroll-mt-20" />
       <Panel title="2 · What can I play?">
         <div className="flex flex-wrap gap-2">
           {views.map((item) => (
@@ -220,6 +308,7 @@ function Companion() {
               onSaved={setSaved}
             />
           )}
+          <div id="practice" className="scroll-mt-20" />
           <PracticePanel progression={progression} board={board} fills={practiceFills} lowStringOnTop={lowStringOnTop} instrument={instrument} />
         </>
       )}

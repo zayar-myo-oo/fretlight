@@ -1,7 +1,7 @@
 "use client";
 
-import { type MusicKey, SHARP_NAMES, findDiatonicChord, getChord } from "@fretlight/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ChordMatch, type MusicKey, SHARP_NAMES, findDiatonicChord, getChord } from "@fretlight/core";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
@@ -21,8 +21,22 @@ function describeError(error: unknown): string {
  * Live chord detection from the microphone or an audio interface.
  * The audio work lives in `ChordListener`; this only renders its frames.
  */
-export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
+export function LiveChordPanel({
+  activeKey,
+  onChord,
+  footer,
+  title = "Live Chord Detection",
+}: {
+  activeKey: MusicKey | null;
+  /** Called once each time a new stable chord is heard. */
+  onChord?: (chord: ChordMatch) => void;
+  footer?: ReactNode;
+  title?: string;
+}) {
   const listener = useRef<ChordListener | null>(null);
+  const lastSymbol = useRef<string | null>(null);
+  const onChordRef = useRef(onChord);
+  onChordRef.current = onChord;
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [deviceId, setDeviceId] = useState("");
   const [running, setRunning] = useState(false);
@@ -39,12 +53,21 @@ export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
     return () => void current.stop();
   }, []);
 
+  const handleFrame = useCallback((next: ChordFrame) => {
+    setFrame(next);
+    const symbol = next.chord?.symbol ?? null;
+    if (next.chord && symbol !== lastSymbol.current) {
+      lastSymbol.current = symbol;
+      onChordRef.current?.(next.chord);
+    }
+  }, []);
+
   const start = useCallback(async () => {
     setError(null);
     const current = listener.current ?? (listener.current = new ChordListener());
     const label = devices.find((d) => d.deviceId === deviceId)?.label ?? "";
     try {
-      await current.start(deviceId, label, setFrame);
+      await current.start(deviceId, label, handleFrame);
       setRunning(true);
       // Labels only appear once permission is granted, so refresh the list now.
       setDevices(await listInputs());
@@ -52,12 +75,13 @@ export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
       setRunning(false);
       setError(describeError(e));
     }
-  }, [deviceId, devices]);
+  }, [deviceId, devices, handleFrame]);
 
   const stop = useCallback(async () => {
     await listener.current?.stop();
     setRunning(false);
     setFrame(null);
+    lastSymbol.current = null;
   }, []);
 
   // Switching device while listening should just work.
@@ -65,7 +89,7 @@ export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
     setDeviceId(id);
     if (running) {
       const label = devices.find((d) => d.deviceId === id)?.label ?? "";
-      listener.current?.start(id, label, setFrame).catch((e) => {
+      listener.current?.start(id, label, handleFrame).catch((e) => {
         setRunning(false);
         setError(describeError(e));
       });
@@ -78,7 +102,7 @@ export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
 
   return (
     <Panel
-      title="Live Chord Detection"
+      title={title}
       meta={<Badge tone={running ? "theory" : "neutral"}>{running ? "Listening" : "Off"}</Badge>}
     >
       <div className="flex flex-col gap-4">
@@ -167,6 +191,8 @@ export function LiveChordPanel({ activeKey }: { activeKey: MusicKey | null }) {
             )}
           </>
         )}
+
+        {footer}
       </div>
     </Panel>
   );
