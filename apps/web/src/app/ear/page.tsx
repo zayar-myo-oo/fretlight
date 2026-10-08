@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useMounted } from "@/hooks/useMounted";
-import { fretSynth } from "@/lib/audio/fret-synth";
+import { playEvents } from "@/lib/audio/companion-player";
 import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 import { useEarTraining } from "@/store/ear-training";
@@ -29,9 +29,9 @@ export default function EarTrainingPage() {
   const record = useEarTraining((s) => s.record);
 
   const play = useCallback(async (q: EarQuestion) => {
-    fretSynth.stopAll();
-    const start = (await fretSynth.warm(q.midi.map((midi) => ({ midi })))) + 0.05;
-    q.midi.forEach((midi, i) => void fretSynth.pluck(midi, undefined, { at: start + (q.harmonic ? i * 0.015 : i * 0.7) }));
+    // playEvents drops a play that was replaced while samples were still loading, so a
+    // quick "Play again" never stacks two copies.
+    await playEvents(q.midi.map((midi, i) => ({ midi, at: q.harmonic ? i * 0.015 : i * 0.7 })), 2);
   }, []);
 
   const next = useCallback(() => {

@@ -21,6 +21,7 @@ export class ProgressionLoop {
   private timer: ReturnType<typeof setInterval> | null = null;
   private frame = 0;
   private running = false;
+  private generation = 0;
 
   get isRunning(): boolean {
     return this.running;
@@ -44,8 +45,11 @@ export class ProgressionLoop {
     };
 
     // Render every note once before the clock starts, so the first pass is not late.
+    // `warm` can take a moment while samples download. A stop or restart in the
+    // meantime makes this start stale; without the check both would loop at once.
+    const generation = this.generation;
     const t0 = (await fretSynth.warm(pass())) + 0.1;
-    if (!this.running) return;
+    if (!this.running || generation !== this.generation) return;
     let scheduled = 0;
     const schedule = (index: number) => {
       for (const e of pass()) {
@@ -82,6 +86,7 @@ export class ProgressionLoop {
   }
 
   stop(): void {
+    this.generation++;
     this.running = false;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;

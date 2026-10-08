@@ -88,8 +88,11 @@ export function buildIdeaEvents(
 }
 
 let doneTimer: ReturnType<typeof setTimeout> | undefined;
+/** Bumped by every stop, so a play still waiting for samples knows it was replaced. */
+let playId = 0;
 
 export function stopCompanion(): void {
+  playId++;
   clearTimeout(doneTimer);
   fretSynth.stopAll();
 }
@@ -97,7 +100,10 @@ export function stopCompanion(): void {
 /** Schedule events from now. Resolves `onDone` when the last one has had time to sound. */
 export async function playEvents(events: readonly PlayEvent[], seconds: number, onDone?: () => void): Promise<void> {
   stopCompanion();
+  const id = playId;
   const start = (await fretSynth.warm(events)) + 0.08;
+  // Pressed Play again (or Stop) while the samples were loading: this play is stale.
+  if (id !== playId) return;
   await Promise.all(
     events.map((e) =>
       fretSynth.pluck(e.midi, e.preset, {
