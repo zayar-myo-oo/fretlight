@@ -45,6 +45,8 @@ export default function MusicTheoryPage() {
   const [chordSel, setChordSel] = useState<ChordSel | null>(null);
   const [manualMode, setManualMode] = useState<KeyMode>("major");
   const [saving, setSaving] = useState(false);
+  // Off by default: the neck shows only what you tapped until you ask for a key overlay.
+  const [showKey, setShowKey] = useState(false);
 
   // Selected positions that still exist on the current board (tuning/fret count can change).
   const selectedPositions = useMemo(
@@ -94,7 +96,11 @@ export default function MusicTheoryPage() {
     if (chord) chord.pitchClasses.forEach((pc, i) => names.set(pc, chord.notes[i]!));
     const nameOf = (pc: number) => names.get(pc) ?? SHARP_NAMES[pc]!;
 
-    const highlight = chord ? new Set(chord.pitchClasses) : activeKey ? new Set(activeKey.pitchClasses) : null;
+    const highlight = chord
+      ? new Set(chord.pitchClasses)
+      : activeKey && showKey
+        ? new Set(activeKey.pitchClasses)
+        : null;
     const rootPc = chord ? chord.root : activeKey?.root;
     const out = new Map<string, FretMarker>();
 
@@ -122,7 +128,7 @@ export default function MusicTheoryPage() {
       });
     }
     return [...out.values()];
-  }, [board, activeKey, chord, selectedPositions]);
+  }, [board, activeKey, chord, showKey, selectedPositions]);
 
   const toggle = (string: number, fret: number, midi: number) => {
     const id = posKey(string, fret);
@@ -143,11 +149,13 @@ export default function MusicTheoryPage() {
     setSelected(new Set());
     setChosenKey(null);
     setChordSel(null);
+    setShowKey(false);
   };
 
   const pickKey = (key: MusicKey) => {
     setChosenKey(key);
     setChordSel(null);
+    setShowKey(true);
   };
 
   const keySymbols = triads.map((c) => c.symbol);
@@ -205,9 +213,16 @@ export default function MusicTheoryPage() {
       <Panel
         title="Pick notes on the neck"
         meta={
-          <Button size="sm" variant="ghost" onClick={() => stopTheory()}>
-            ■ Stop
-          </Button>
+          <div className="flex items-center gap-2">
+            {activeKey && !chord && (
+              <Button size="sm" variant="ghost" onClick={() => setShowKey((v) => !v)}>
+                {showKey ? "Hide key notes" : "Show key notes"}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => stopTheory()}>
+              ■ Stop
+            </Button>
+          </div>
         }
       >
         <div ref={boardRef}>
@@ -220,11 +235,15 @@ export default function MusicTheoryPage() {
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-[var(--color-ink-faint)]">
           <LegendDot className="bg-white" label="Selected" />
-          <LegendDot className="bg-[rgba(255,92,138,0.92)]" label={chord ? "Chord root" : "Key root"} />
-          <LegendDot
-            className={chord ? "bg-[rgba(34,224,214,0.5)]" : "bg-[rgba(139,124,255,0.5)]"}
-            label={chord ? "Chord tone" : "Scale note"}
-          />
+          {(chord || showKey) && (
+            <>
+              <LegendDot className="bg-[rgba(255,92,138,0.92)]" label={chord ? "Chord root" : "Key root"} />
+              <LegendDot
+                className={chord ? "bg-[rgba(34,224,214,0.5)]" : "bg-[rgba(139,124,255,0.5)]"}
+                label={chord ? "Chord tone" : "Scale note"}
+              />
+            </>
+          )}
         </div>
       </Panel>
 
