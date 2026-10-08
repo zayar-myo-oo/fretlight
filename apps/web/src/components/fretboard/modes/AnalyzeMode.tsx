@@ -14,6 +14,7 @@ import {
 } from "@fretlight/core";
 import { useMemo, useRef, useState } from "react";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
+import { SoundMenu } from "@/components/fretboard/SoundMenu";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { NotePicker } from "@/components/ui/NotePicker";
@@ -201,6 +202,7 @@ export function AnalyzeMode() {
                 {showKey ? "Hide key notes" : "Show key notes"}
               </Button>
             )}
+            <SoundMenu />
             <Button size="sm" variant="ghost" onClick={() => stopTheory()}>
               ■ Stop sound
             </Button>

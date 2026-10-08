@@ -18,6 +18,7 @@ import {
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { DisplayMenu } from "@/components/fretboard/DisplayMenu";
+import { SoundMenu } from "@/components/fretboard/SoundMenu";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
 import { PositionControl } from "@/components/fretboard/PositionControl";
 import { Badge } from "@/components/ui/Badge";
@@ -160,7 +161,12 @@ export function ExploreMode() {
         </div>
       </Panel>
 
-      <Panel title="2 · See it on the neck" meta={<DisplayMenu view={view} onViewChange={setView} />}>
+      <Panel title="2 · See it on the neck" meta={
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            <SoundMenu />
+            <DisplayMenu view={view} onViewChange={setView} />
+          </div>
+        }>
         <div className="mb-4">
           <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
           <p className="mt-0.5 text-sm text-[var(--color-ink-dim)]">{subtitle}</p>

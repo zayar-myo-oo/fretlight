@@ -41,6 +41,7 @@ export * from "./audio/stabilizer";
 export * from "./audio/pitch-state";
 export * from "./audio/signal-state";
 export * from "./audio/chroma";
+export * from "./audio/pluck";
 
 // Timing
 export * from "./timing/metronome";
