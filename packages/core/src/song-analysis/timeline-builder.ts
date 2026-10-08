@@ -83,12 +83,17 @@ const SHARP_ROOTS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#",
  * when it belongs to the key, otherwise with flats (Bb, Eb, not A#, D#) unless
  * the key itself is a sharp key.
  */
+export function spellPitchClass(pitchClass: number, key: MusicKey | null): string {
+  const pc = mod(pitchClass, 12);
+  const inKey = key ? key.pitchClasses.indexOf(pc) : -1;
+  if (key && inKey >= 0) return key.notes[inKey]!;
+  const sharpKey = key?.notes.some((n) => n.includes("#")) ?? false;
+  return (sharpKey ? SHARP_ROOTS : FLAT_ROOTS)[pc]!;
+}
+
 export function spellChord(chord: ChordDetection, key: MusicKey | null): string | null {
   if (chord.root === null || chord.quality === null) return null;
-  const inKey = key ? key.pitchClasses.indexOf(chord.root) : -1;
-  const sharpKey = key?.notes.some((n) => n.includes("#")) ?? false;
-  const root = key && inKey >= 0 ? key.notes[inKey]! : (sharpKey ? SHARP_ROOTS : FLAT_ROOTS)[chord.root]!;
-  return chordSymbol(chord.root, chord.quality, root);
+  return chordSymbol(chord.root, chord.quality, spellPitchClass(chord.root, key));
 }
 
 /** Replace one chord by hand. `root === null` clears it. Timing and neighbours are untouched. */

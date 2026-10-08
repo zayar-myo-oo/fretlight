@@ -120,7 +120,16 @@ function driveCurve(drive: number): Float32Array<ArrayBuffer> {
   return curve;
 }
 
+export interface PluckOptions {
+  readonly when?: number;
+  /** Absolute start on the audio clock (from `warm`); wins over `when`. */
+  readonly at?: number;
+  readonly gain?: number;
+  readonly mute?: boolean;
+}
+
 export class FretSynth {
+  private active = new Set<AudioBufferSourceNode>();
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
   private buffers = new Map<string, AudioBuffer>();
@@ -190,6 +199,23 @@ export class FretSynth {
     this.emit();
   }
 
+  /** Seconds on the audio clock, or 0 before any sound has played. */
+  currentTime(): number {
+    return this.context?.currentTime ?? 0;
+  }
+
+  /** Silence everything that is sounding or scheduled. */
+  stopAll(): void {
+    for (const source of this.active) {
+      try {
+        source.stop();
+      } catch {
+        // already ended
+      }
+    }
+    this.active.clear();
+  }
+
   dispose(): void {
     void this.context?.close();
     this.context = null;
@@ -197,28 +223,15 @@ export class FretSynth {
     this.buffers.clear();
   }
 
-  /** Pluck `midi` with the current sound and let it ring and decay on its own. */
-  async pluck(midi: number, preset: SoundPreset = this.getPreset()): Promise<void> {
+  /**
+   * Pluck `midi` with the current sound and let it ring and decay on its own.
+   * `when` delays the note on the audio clock (seconds), `gain` scales it, and
+   * `mute` chokes it after a moment, like a palm-muted or scratched string.
+   */
+  async pluck(midi: number, preset: SoundPreset = this.getPreset(), options: PluckOptions = {}): Promise<void> {
     const context = await this.ensureContext();
-    const frequency = midiToFrequency(midi);
-    const now = context.currentTime;
-
-    const key = `${preset.id}:${midi}`;
-    let buffer = this.buffers.get(key);
-    if (!buffer) {
-      const sustain = preset.sustain * Math.min(2, Math.max(0.4, (220 / frequency) ** 0.4));
-      const samples = renderPluck({
-        frequency,
-        sampleRate: context.sampleRate,
-        decaySeconds: sustain,
-        brightness: preset.brightness,
-        position: preset.position,
-        seed: midi * 7 + 3,
-      });
-      buffer = context.createBuffer(1, samples.length, context.sampleRate);
-      buffer.getChannelData(0).set(samples);
-      this.buffers.set(key, buffer);
-    }
+    const now = options.at ?? context.currentTime + (options.when ?? 0);
+    const buffer = this.bufferFor(context, preset, midi);
 
     const source = context.createBufferSource();
     source.buffer = buffer;
@@ -250,14 +263,50 @@ export class FretSynth {
     });
 
     const level = context.createGain();
-    level.gain.value = preset.level;
+    const peak = preset.level * (options.gain ?? 1);
+    level.gain.setValueAtTime(peak, now);
+    if (options.mute) level.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     chain(level);
     level.connect(this.master!);
 
+    this.active.add(source);
     source.onended = () => {
+      this.active.delete(source);
       for (const node of nodes) node.disconnect();
     };
     source.start(now);
+    if (options.mute) source.stop(now + 0.2);
+  }
+
+  private bufferFor(context: AudioContext, preset: SoundPreset, midi: number): AudioBuffer {
+    const key = `${preset.id}:${midi}`;
+    let buffer = this.buffers.get(key);
+    if (!buffer) {
+      const frequency = midiToFrequency(midi);
+      const sustain = preset.sustain * Math.min(2, Math.max(0.4, (220 / frequency) ** 0.4));
+      const samples = renderPluck({
+        frequency,
+        sampleRate: context.sampleRate,
+        decaySeconds: sustain,
+        brightness: preset.brightness,
+        position: preset.position,
+        seed: midi * 7 + 3,
+      });
+      buffer = context.createBuffer(1, samples.length, context.sampleRate);
+      buffer.getChannelData(0).set(samples);
+      this.buffers.set(key, buffer);
+    }
+    return buffer;
+  }
+
+  /**
+   * Render the notes of a phrase ahead of time and return the audio clock, so a
+   * whole phrase can then be scheduled against one start time with no drift.
+   */
+  async warm(items: readonly { midi: number; preset?: SoundPreset }[]): Promise<number> {
+    const context = await this.ensureContext();
+    for (const item of items) this.bufferFor(context, item.preset ?? this.getPreset(), item.midi);
+    return context.currentTime;
   }
 
   private async ensureContext(): Promise<AudioContext> {

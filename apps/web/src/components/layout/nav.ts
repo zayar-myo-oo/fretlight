@@ -61,6 +61,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   },
   {
+    href: "/companion",
+    label: "Companion",
+    hint: "What can I play over this progression?",
+    icon: "M9 18V6l10-2v12M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm10-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9 10l10-2",
+  },
+  {
     href: "/analyzer",
     label: "Analyzer",
     hint: "Find the chords, key and sections of a song",

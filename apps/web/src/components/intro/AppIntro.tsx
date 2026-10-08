@@ -12,6 +12,7 @@ const FEATURES = [
   { href: "/fretboard", title: "Fretboard", text: "See scales and chords on the neck, find the key of notes you pick, or play and see which chord you're playing." },
   { href: "/practice", title: "Practice", text: "Guided scale exercises. Play along and get scored on accuracy." },
   { href: "/analyzer", title: "Analyzer", text: "Load a song file and get its chords, key, tempo and sections, then follow along as it plays." },
+  { href: "/companion", title: "Companion", text: "Type the chords your band is playing and get fills, melodies, triads and bass lines that fit." },
   { href: "/song", title: "Song", text: "Learn a piece phrase by phrase." },
   { href: "/bassline", title: "Bassline", text: "Turn a chord progression into a bassline to practise." },
   { href: "/metronome", title: "Metronome", text: "Keep time at any tempo." },

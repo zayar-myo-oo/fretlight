@@ -1,4 +1,6 @@
 export interface AnalysisImage {
+  /** Monospace lines drawn under the info lines, as-is (a guitar tab, for instance). */
+  readonly preformatted?: readonly string[];
   /** The rendered fretboard SVG element. */
   readonly svg: SVGSVGElement;
   readonly title: string;
@@ -54,7 +56,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 /** Draws the analysis card (title, info lines, fretboard) and returns a PNG blob. */
-export async function renderAnalysisPng({ svg, title, lines }: AnalysisImage): Promise<Blob> {
+export async function renderAnalysisPng({ svg, title, lines, preformatted = [] }: AnalysisImage): Promise<Blob> {
   const { img, width, height } = await svgToImage(svg);
   const pad = 48;
   const W = Math.max(1200, width + pad * 2);
@@ -66,7 +68,8 @@ export async function renderAnalysisPng({ svg, title, lines }: AnalysisImage): P
   const rows = lines.map((l) => wrap(measure, `${l.label}: ${l.value}`, W - pad * 2));
   const textH = rows.reduce((s, r) => s + r.length * 28 + 8, 0);
 
-  const H = Math.ceil(pad + 40 + 60 + boardH + 24 + textH + pad);
+  const tabH = preformatted.length ? preformatted.length * 22 + 40 : 0;
+  const H = Math.ceil(pad + 40 + 60 + boardH + 24 + textH + tabH + pad);
   const canvas = document.createElement("canvas");
   const dpr = 2;
   canvas.width = W * dpr;
@@ -107,6 +110,21 @@ export async function renderAnalysisPng({ svg, title, lines }: AnalysisImage): P
     });
     y += 8;
   });
+
+  if (preformatted.length) {
+    y += 8;
+    ctx.fillStyle = "#6c7a94";
+    ctx.font = `14px ${MONO}`;
+    ctx.fillText("TAB", pad, y);
+    y += 24;
+    ctx.fillStyle = "#e8edf7";
+    const longest = Math.max(...preformatted.map((l) => l.length));
+    ctx.font = `${Math.max(8, Math.min(16, Math.floor((W - pad * 2) / (longest * 0.62))))}px ${MONO}`;
+    for (const line of preformatted) {
+      ctx.fillText(line, pad, y);
+      y += 22;
+    }
+  }
 
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG export failed"))), "image/png"),

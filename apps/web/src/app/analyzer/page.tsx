@@ -11,7 +11,9 @@ import {
   editChord,
   formatTimestamp,
   sectionAt,
+  spellChord,
 } from "@fretlight/core";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChordChart } from "@/components/analyzer/ChordChart";
 import { ChordPanel } from "@/components/analyzer/ChordPanel";
@@ -125,6 +127,24 @@ export default function AnalyzerPage() {
     [analysis, chords],
   );
 
+  // The first stretch of repeating chords, ready to hand to the Companion.
+  const companionLink = useMemo(() => {
+    if (!analysis) return null;
+    const names: string[] = [];
+    const take = (indexes: readonly number[]) => {
+      for (const i of indexes) {
+        const name = spellChord(chords[i]!, keyInfo);
+        if (name && names[names.length - 1] !== name && names.length < 8) names.push(name);
+      }
+    };
+    for (const { rows } of chart) {
+      take(rows.flat().flatMap((bar) => bar.chordIndexes));
+      if (names.length >= 4) break;
+    }
+    if (names.length < 2) take(chords.map((_, i) => i));
+    return names.length >= 2 ? `/companion?prog=${encodeURIComponent(names.join(" "))}&instrument=${analysis.instrument}` : null;
+  }, [analysis, chart, chords, keyInfo]);
+
   const activeChord = chordAt(chords, player.time);
   const activeSection = analysis ? sectionAt(analysis.sections, player.time) : -1;
   const shown = player.playing ? activeChord : (selected ?? activeChord);
@@ -210,6 +230,18 @@ export default function AnalyzerPage() {
                 <Stat label="BPM">{bpmLabel(analysis)}</Stat>
                 <Stat label="Duration">{formatTimestamp(analysis.duration)}</Stat>
               </div>
+
+              {companionLink && (
+                <div>
+                  <Link
+                    href={companionLink}
+                    className="inline-flex h-10 items-center rounded-xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)] px-4 text-sm font-medium text-[var(--color-signal)] hover:bg-[rgba(34,224,214,0.18)]"
+                  >
+                    What can I play? →
+                  </Link>
+                  <span className="ml-3 text-xs text-[var(--color-ink-faint)]">Open the Companion with this progression</span>
+                </div>
+              )}
 
               {!anyChord && (
                 <p className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-sm text-[var(--color-ink-dim)]">
