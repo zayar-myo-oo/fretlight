@@ -29,7 +29,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { playEvents } from "@/lib/audio/companion-player";
 import { pitchClassMarkers } from "@/lib/companion/markers";
-import { useT } from "@/lib/i18n/locale";
+import { useT, useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 interface ViewProps {
@@ -230,6 +230,7 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
   const [inversion, setInversion] = useState<Inversion | "all">("all");
   const [shapeIndex, setShapeIndex] = useState<number | "all">("all");
   const [labels, setLabels] = useState<"names" | "degrees">("names");
+  const x = useTx();
 
   const quality = chord ? coreTriad(chord.quality) : null;
   const shapes = useMemo(() => (chord && quality ? triadShapes(board, chord.root, quality, inversion) : []), [board, chord, quality, inversion]);
@@ -264,11 +265,10 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
   };
 
   return (
-    <Panel title="Triads">
+    <Panel title={x("Triads")}>
       <div className="mb-4 rounded-xl border border-[rgba(34,224,214,0.3)] bg-[rgba(34,224,214,0.06)] p-3 text-sm leading-relaxed text-[var(--color-ink-dim)]">
-        <span className="font-medium text-[var(--color-signal)]">Triads are the secret to good lead guitar.</span> A triad is
-        a chord's root, 3rd and 5th, the three strongest notes. Great melodies keep landing on them instead of running
-        up and down a scale.
+        <span className="font-medium text-[var(--color-signal)]">{x("Triads are the secret to good lead guitar.")}</span>{" "}
+        {x("A triad is a chord's root, 3rd and 5th, the three strongest notes. Great melodies keep landing on them instead of running up and down a scale.")}
       </div>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -279,7 +279,7 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
             <div key={c.index} className={cn("rounded-xl border px-3 py-2", c.index === chord.index ? "border-[var(--color-signal)]" : "border-[var(--color-hairline)]")}>
               <span className="readout text-sm font-semibold">{c.symbol}</span>
               <span className="readout ml-2 text-xs text-[var(--color-ink-faint)]">
-                {q ? pcs.map((pc) => spellPitchClass(pc, progression.key.key)).join(" ") : "no 3rd (suspended)"}
+                {q ? pcs.map((pc) => spellPitchClass(pc, progression.key.key)).join(" ") : x("no 3rd (suspended)")}
               </span>
             </div>
           );
@@ -288,7 +288,7 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
 
       {!quality ? (
         <p className="text-sm text-[var(--color-ink-dim)]">
-          {chord.symbol} is a suspended chord: it has no 3rd, so it has no triad. Pick another chord above.
+          {x("{chord} is a suspended chord: it has no 3rd, so it has no triad. Pick another chord above.", { chord: chord.symbol })}
         </p>
       ) : (
         <>
@@ -296,10 +296,10 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
             <SegmentedControl
               size="sm"
               options={[
-                { value: "0", label: "Root" },
-                { value: "1", label: "1st inversion" },
-                { value: "2", label: "2nd inversion" },
-                { value: "all", label: "All" },
+                { value: "0", label: x("Root") },
+                { value: "1", label: x("1st inversion") },
+                { value: "2", label: x("2nd inversion") },
+                { value: "all", label: x("All") },
               ]}
               value={String(inversion)}
               onChange={(v) => setInversion(v === "all" ? "all" : (Number(v) as Inversion))}
@@ -307,22 +307,22 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
             <SegmentedControl
               size="sm"
               options={[
-                { value: "names", label: "Notes" },
+                { value: "names", label: x("Notes") },
                 { value: "degrees", label: "R · 3 · 5" },
               ]}
               value={labels}
               onChange={setLabels}
             />
             <Button size="sm" onClick={play} disabled={visible.length === 0}>
-              ▶ Play shape
+              {x("▶ Play shape")}
             </Button>
           </div>
 
           <p className="mb-2 text-sm text-[var(--color-ink-dim)]">
-            {chord.symbol} triad:{" "}
+            {x("{chord} triad:", { chord: chord.symbol })}{" "}
             {(inversion === "all" ? ([0, 1, 2] as Inversion[]) : [inversion]).map((inv) => (
               <span key={inv} className="readout mr-4 whitespace-nowrap">
-                <span className="text-[var(--color-ink-faint)]">{INVERSION_LABELS[inv]}</span>{" "}
+                <span className="text-[var(--color-ink-faint)]">{x(INVERSION_LABELS[inv])}</span>{" "}
                 {triadOrder(chord.root, quality, inv).map((n) => spellPitchClass(n.pitchClass, progression.key.key)).join(" ")}
               </span>
             ))}
@@ -330,11 +330,11 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
 
           <div className="mb-3 flex flex-wrap gap-1.5">
             <ShapeChip active={shapeIndex === "all"} onClick={() => setShapeIndex("all")}>
-              Whole neck
+              {x("Whole neck")}
             </ShapeChip>
             {shapes.slice(0, 14).map((shape, i) => (
               <ShapeChip key={i} active={shapeIndex === i} onClick={() => setShapeIndex(i)}>
-                {shape.minFret === 0 ? "open" : `fret ${shape.minFret}`} · {["R", "1st", "2nd"][shape.inversion]} · str {shape.spots[0]!.string + 1}-{shape.spots[2]!.string + 1}
+                {shape.minFret === 0 ? x("open") : x("fret {n}", { n: shape.minFret })} · {["R", "1st", "2nd"][shape.inversion]} · str {shape.spots[0]!.string + 1}-{shape.spots[2]!.string + 1}
               </ShapeChip>
             ))}
           </div>
@@ -342,14 +342,14 @@ export function TriadsView({ board, progression, selected, lowStringOnTop, onLea
           <Fretboard board={board} markers={markers} lowStringOnTop={lowStringOnTop} />
           <Legend
             items={[
-              { color: COLORS.root, label: "Root" },
+              { color: COLORS.root, label: x("Root") },
               { color: COLORS.chord, label: "3rd" },
               { color: COLORS.scale, label: "5th" },
             ]}
           />
           <div className="mt-4">
             <Button variant="primary" onClick={onLead}>
-              Build melody from triads →
+              {x("Build melody from triads →")}
             </Button>
           </div>
         </>
@@ -382,14 +382,14 @@ export function CowboyView({ board, progression, selected, lowStringOnTop, onLea
   }, [progression, selected]);
   const [chord, setChord] = useState<CowboyChord>(initial);
   const [view, setView] = useState<"shape" | "neck" | "triad">("shape");
+  const x = useTx();
   useEffect(() => setChord(initial), [initial]);
 
   if (!supported) {
     return (
-      <Panel title="Cowboy chords">
+      <Panel title={x("Cowboy chords")}>
         <p className="text-sm text-[var(--color-ink-dim)]">
-          Cowboy chords are open shapes for a 6-string guitar in standard tuning. Switch to Guitar (standard tuning) to see them.
-          Triads work on any instrument.
+          {x("Cowboy chords are open shapes for a 6-string guitar in standard tuning. Switch to Guitar (standard tuning) to see them. Triads work on any instrument.")}
         </p>
       </Panel>
     );
@@ -421,11 +421,11 @@ export function CowboyView({ board, progression, selected, lowStringOnTop, onLea
   const groups: [string, CowboyChord["group"]][] = [["Major", "major"], ["Minor", "minor"], ["7th", "seventh"], ["Suspended / add", "suspended"]];
 
   return (
-    <Panel title="Cowboy chords" meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Common open shapes on 6-string guitar</span>}>
+    <Panel title={x("Cowboy chords")} meta={<span className="text-[11px] text-[var(--color-ink-faint)]">{x("Common open shapes on 6-string guitar")}</span>}>
       <div className="mb-4 flex flex-col gap-2">
         {groups.map(([label, group]) => (
           <div key={group} className="flex flex-wrap items-center gap-1.5">
-            <span className="hud-label w-24 shrink-0">{label}</span>
+            <span className="hud-label w-24 shrink-0">{x(label)}</span>
             {COWBOY_CHORDS.filter((c) => c.group === group).map((c) => (
               <button
                 key={c.symbol}
@@ -444,65 +444,65 @@ export function CowboyView({ board, progression, selected, lowStringOnTop, onLea
             ))}
           </div>
         ))}
-        <p className="text-[11px] text-[var(--color-ink-faint)]">Purple chords are in your progression.</p>
+        <p className="text-[11px] text-[var(--color-ink-faint)]">{x("Purple chords are in your progression.")}</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(220px,1fr)_2fr]">
         <div className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-4">
           <h3 className="readout text-2xl font-semibold text-[var(--color-signal)]">{chord.symbol}</h3>
-          <p className="text-sm text-[var(--color-ink-dim)]">{qualityInfo(chord.quality).name}</p>
+          <p className="text-sm text-[var(--color-ink-dim)]">{x(qualityInfo(chord.quality).name)}</p>
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-            <dt className="hud-label">Shape</dt>
+            <dt className="hud-label">{x("Shape")}</dt>
             <dd className="readout">{shapeText(chord)}</dd>
-            <dt className="hud-label">Fingers</dt>
+            <dt className="hud-label">{x("Fingers")}</dt>
             <dd className="readout">{chord.fingers.map((f) => (f === 0 ? "–" : f)).join(" ")}</dd>
-            <dt className="hud-label">Notes</dt>
+            <dt className="hud-label">{x("Notes")}</dt>
             <dd className="readout">{played.map((n) => nameMap.get(n.pitchClass)).join(" ")}</dd>
-            <dt className="hud-label">Roles</dt>
+            <dt className="hud-label">{x("Roles")}</dt>
             <dd className="readout">{played.map((n) => n.role).join(" ")}</dd>
-            <dt className="hud-label">Strings</dt>
-            <dd className="text-xs text-[var(--color-ink-dim)]">{open} open · {muted} not played</dd>
+            <dt className="hud-label">{x("Strings")}</dt>
+            <dd className="text-xs text-[var(--color-ink-dim)]">{x("{open} open · {muted} not played", { open, muted })}</dd>
           </dl>
-          <p className="mt-3 text-[11px] text-[var(--color-ink-faint)]">Strings are listed low E to high e. x or – means not played or no finger.</p>
+          <p className="mt-3 text-[11px] text-[var(--color-ink-faint)]">{x("Strings are listed low E to high e. x or – means not played or no finger.")}</p>
         </div>
 
         <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Button size="sm" variant="primary" onClick={play}>
-              ▶ Play
+              {x("▶ Play")}
             </Button>
             <SegmentedControl
               size="sm"
               options={[
-                { value: "shape", label: "Open shape" },
-                { value: "neck", label: "Show fretboard" },
-                { value: "triad", label: "Show triad", hint: "Extract the root, 3rd and 5th" },
+                { value: "shape", label: x("Open shape") },
+                { value: "neck", label: x("Show fretboard") },
+                { value: "triad", label: x("Show triad"), hint: x("Extract the root, 3rd and 5th") },
               ]}
               value={view}
               onChange={setView}
             />
           </div>
           <Fretboard board={board} markers={markers} lowStringOnTop={lowStringOnTop} {...(view === "neck" ? {} : { toFret: 5 })} />
-          <Legend items={[{ color: COLORS.root, label: "Root" }, { color: COLORS.chord, label: "3rd / other" }, { color: COLORS.scale, label: "5th" }]} />
+          <Legend items={[{ color: COLORS.root, label: x("Root") }, { color: COLORS.chord, label: x("3rd / other") }, { color: COLORS.scale, label: "5th" }]} />
         </div>
       </div>
 
       <div className="mt-5 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-4">
-        <p className="hud-label mb-2">From cowboy chord to melody</p>
+        <p className="hud-label mb-2">{x("From cowboy chord to melody")}</p>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Step>{chord.symbol} shape: {played.map((n) => nameMap.get(n.pitchClass)).join(" ")}</Step>
+          <Step>{x("{chord} shape: {notes}", { chord: chord.symbol, notes: played.map((n) => nameMap.get(n.pitchClass)).join(" ") })}</Step>
           <Arrow />
-          <Step>Chord tones: {[...new Set(chordPitchClasses(chord.root, chord.quality))].map((pc) => nameMap.get(pc)).join(" ")}</Step>
+          <Step>{x("Chord tones: {notes}", { notes: [...new Set(chordPitchClasses(chord.root, chord.quality))].map((pc) => nameMap.get(pc)).join(" ") })}</Step>
           <Arrow />
-          <Step>{triad ? `Triad: ${triad.notes.map((pc) => nameMap.get(pc)).join(" ")}` : "No triad (no 3rd)"}</Step>
+          <Step>{triad ? x("Triad: {notes}", { notes: triad.notes.map((pc) => nameMap.get(pc)).join(" ") }) : x("No triad (no 3rd)")}</Step>
           <Arrow />
           <button onClick={onLead} className="rounded-lg border border-[var(--color-signal)] px-2.5 py-1.5 text-xs text-[var(--color-signal)] hover:bg-[rgba(34,224,214,0.1)]">
-            Lead melody →
+            {x("Lead melody →")}
           </button>
         </div>
         {triad && view !== "triad" && (
           <button onClick={() => setView("triad")} className="mt-3 text-xs underline text-[var(--color-ink-dim)]">
-            Extract triad
+            {x("Extract triad")}
           </button>
         )}
       </div>

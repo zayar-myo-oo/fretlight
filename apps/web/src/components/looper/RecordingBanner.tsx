@@ -4,6 +4,7 @@ import { secondsPerBar } from "@fretlight/core";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { LooperEngine, LooperState } from "@/lib/looper/looper-engine";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 const clock = (seconds: number) => {
@@ -19,6 +20,7 @@ const clock = (seconds: number) => {
 export function RecordingBanner({ engine, state, onStop }: { engine: LooperEngine; state: LooperState; onStop: () => void }) {
   const { recording, phase, settings, loopSeconds } = state;
   const [now, setNow] = useState(0);
+  const x = useTx();
 
   useEffect(() => {
     let frame = 0;
@@ -33,11 +35,11 @@ export function RecordingBanner({ engine, state, onStop }: { engine: LooperEngin
   // Show it in the tab title too, for anyone who has switched windows.
   useEffect(() => {
     const original = document.title;
-    document.title = phase === "recording" ? "● Recording… Fretlight" : "Get ready… Fretlight";
+    document.title = x(phase === "recording" ? "● Recording… Fretlight" : "Get ready… Fretlight");
     return () => {
       document.title = original;
     };
-  }, [phase]);
+  }, [phase, x]);
 
   if (!recording) return null;
   const counting = phase === "counting";
@@ -59,12 +61,12 @@ export function RecordingBanner({ engine, state, onStop }: { engine: LooperEngin
       {counting ? (
         <>
           <span className="readout w-16 text-center text-6xl leading-none font-bold text-[#ffb454]">
-            {remaining > 0.02 ? settings.beatsPerBar - ((Math.max(1, Math.ceil(remaining / (60 / settings.bpm) - 0.001)) - 1) % settings.beatsPerBar) : "GO"}
+            {remaining > 0.02 ? settings.beatsPerBar - ((Math.max(1, Math.ceil(remaining / (60 / settings.bpm) - 0.001)) - 1) % settings.beatsPerBar) : x("GO")}
           </span>
           <div className="min-w-[200px] flex-1">
-            <p className="text-lg font-semibold">Get ready…</p>
+            <p className="text-lg font-semibold">{x("Get ready…")}</p>
             <p className="text-sm text-[var(--color-ink-dim)]">
-              {recording.master ? "Recording starts after the count-in. Play your chords, then press Stop." : `Recording “${recording.name}” starts when the loop comes round. Play along.`}
+              {recording.master ? x("Recording starts after the count-in. Play your chords, then press Stop.") : x("Recording “{name}” starts when the loop comes round. Play along.", { name: recording.name })}
             </p>
           </div>
         </>
@@ -77,12 +79,12 @@ export function RecordingBanner({ engine, state, onStop }: { engine: LooperEngin
           <span className="readout text-3xl">{recording.master ? clock(elapsed) : `${clock(Math.min(elapsed, loopSeconds ?? elapsed))} / ${clock(loopSeconds ?? 0)}`}</span>
           <div className="min-w-[200px] flex-1">
             <p className="text-lg font-semibold">
-              {recording.master ? `Recording: bar ${Math.max(1, Math.floor(elapsed / bar) + 1)}` : `Recording “${recording.name}”`}
+              {recording.master ? x("Recording: bar {n}", { n: Math.max(1, Math.floor(elapsed / bar) + 1) }) : x("Recording “{name}”", { name: recording.name })}
             </p>
             <p className="text-sm text-[var(--color-ink-dim)]">
               {recording.master
-                ? "Play now. Press Stop right after your last chord; it rounds to whole bars."
-                : "Play now. It records one full loop, then stops by itself."}
+                ? x("Play now. Press Stop right after your last chord; it rounds to whole bars.")
+                : x("Play now. It records one full loop, then stops by itself.")}
             </p>
             {!recording.master && loopSeconds ? (
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.1)]">
@@ -93,7 +95,7 @@ export function RecordingBanner({ engine, state, onStop }: { engine: LooperEngin
         </>
       )}
       <Button size="lg" variant={counting ? "secondary" : "danger"} onClick={onStop}>
-        {counting ? "Cancel" : recording.master ? "■ Stop & loop" : "■ Cancel take"}
+        {x(counting ? "Cancel" : recording.master ? "■ Stop & loop" : "■ Cancel take")}
       </Button>
     </div>
   );

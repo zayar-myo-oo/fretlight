@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { type LooperTrack, type TrackKind } from "@/lib/looper/looper-engine";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 export const KIND_LABELS: Record<TrackKind, string> = {
@@ -46,6 +47,7 @@ export const TrackRow = memo(function TrackRow(p: Props) {
   const dragging = useRef<number | null>(null);
   const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const x = useTx();
 
   useEffect(() => {
     const el = canvas.current;
@@ -93,18 +95,18 @@ export const TrackRow = memo(function TrackRow(p: Props) {
           <input
             value={track.name}
             onChange={(e) => p.onRename(e.target.value)}
-            aria-label="Line name"
+            aria-label={x("Line name")}
             className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--color-hairline)] bg-[var(--color-panel-raised)] px-2 text-sm"
           />
           <select
             value={track.kind}
             onChange={(e) => p.onKind(e.target.value as TrackKind)}
-            aria-label="Line type"
+            aria-label={x("Line type")}
             className="h-8 rounded-lg border border-[var(--color-hairline)] bg-[var(--color-panel-raised)] px-1 text-xs"
           >
             {(Object.keys(KIND_LABELS) as TrackKind[]).map((k) => (
               <option key={k} value={k}>
-                {KIND_LABELS[k]}
+                {x(KIND_LABELS[k])}
               </option>
             ))}
           </select>
@@ -113,7 +115,7 @@ export const TrackRow = memo(function TrackRow(p: Props) {
           <button
             onClick={() => p.onMute(!track.muted)}
             aria-pressed={track.muted}
-            title="Mute"
+            title={x("Mute")}
             className={cn("h-8 w-8 rounded-lg border text-xs font-semibold", track.muted ? "border-[var(--color-error)] bg-[rgba(255,84,112,0.14)] text-[var(--color-error)]" : "border-[var(--color-hairline)] text-[var(--color-ink-dim)]")}
           >
             M
@@ -121,7 +123,7 @@ export const TrackRow = memo(function TrackRow(p: Props) {
           <button
             onClick={() => p.onSolo(!track.solo)}
             aria-pressed={track.solo}
-            title="Solo"
+            title={x("Solo")}
             className={cn("h-8 w-8 rounded-lg border text-xs font-semibold", track.solo ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.14)] text-[var(--color-signal)]" : "border-[var(--color-hairline)] text-[var(--color-ink-dim)]")}
           >
             S
@@ -133,33 +135,33 @@ export const TrackRow = memo(function TrackRow(p: Props) {
             step={0.05}
             value={track.volume}
             onChange={(e) => p.onVolume(Number(e.target.value))}
-            aria-label="Volume"
+            aria-label={x("Volume")}
             className="min-w-0 flex-1 accent-[var(--color-signal)]"
           />
           <span className="readout w-9 text-right text-[11px] text-[var(--color-ink-faint)]">{Math.round(track.volume * 100)}%</span>
         </div>
         <div className="relative flex flex-wrap items-center gap-1.5">
           <Button size="sm" onClick={p.onRerecord} disabled={p.busy}>
-            ● Record again
+            {x("● Record again")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setMenu((v) => !v); setConfirmDelete(false); }} aria-expanded={menu} aria-label="More actions">
-            ⋯ More
+          <Button size="sm" variant="ghost" onClick={() => { setMenu((v) => !v); setConfirmDelete(false); }} aria-expanded={menu} aria-label={x("More actions")}>
+            {x("⋯ More")}
           </Button>
           {menu && (
             <div className="absolute top-full left-0 z-20 mt-1 flex w-44 flex-col gap-0.5 rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] p-1.5 shadow-lg">
               <button className="rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-[rgba(255,255,255,0.06)]" onClick={() => { p.onDownload(); setMenu(false); }}>
-                ↓ Download WAV
+                {x("↓ Download WAV")}
               </button>
               <button className="rounded-lg px-2.5 py-1.5 text-left text-xs hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-40" disabled={p.busy} onClick={() => { p.onDuplicate(); setMenu(false); }}>
-                Duplicate
+                {x("Duplicate")}
               </button>
               {confirmDelete ? (
                 <button className="rounded-lg bg-[rgba(255,84,112,0.16)] px-2.5 py-1.5 text-left text-xs text-[var(--color-error)]" onClick={() => { p.onDelete(); setMenu(false); }}>
-                  Yes, delete this line
+                  {x("Yes, delete this line")}
                 </button>
               ) : (
                 <button className="rounded-lg px-2.5 py-1.5 text-left text-xs text-[var(--color-error)] hover:bg-[rgba(255,84,112,0.1)] disabled:opacity-40" disabled={p.busy} onClick={() => setConfirmDelete(true)}>
-                  Delete…
+                  {x("Delete…")}
                 </button>
               )}
             </div>
@@ -203,17 +205,17 @@ export const TrackRow = memo(function TrackRow(p: Props) {
                 {range.start.toFixed(1)}s – {range.end.toFixed(1)}s
               </span>
               <Button size="sm" onClick={() => p.onPunch(range.start, range.end)} disabled={p.busy}>
-                ● Re-record section
+                {x("● Re-record section")}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => p.onClearSection(range.start, range.end)} disabled={p.busy}>
-                Clear section
+                {x("Clear section")}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelection(null)}>
-                Deselect
+                {x("Deselect")}
               </Button>
             </>
           ) : (
-            <span>Drag across the waveform to fix just one part.</span>
+            <span>{x("Drag across the waveform to fix just one part.")}</span>
           )}
         </div>
       </div>

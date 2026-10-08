@@ -36,6 +36,7 @@ import { useFretboardContext } from "@/hooks/useFretboard";
 import { useLooper } from "@/hooks/useLooper";
 import { stopCompanion } from "@/lib/audio/companion-player";
 import { type SavedIdea, loadSavedIdeas } from "@/lib/companion/saved-ideas";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 import { useSession } from "@/store/session";
 
@@ -74,6 +75,7 @@ function Companion() {
   const { instrumentKind } = useFretboardContext();
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
   const { engine, state: looper } = useLooper();
+  const x = useTx();
 
   const [tab, setTab] = useState<Tab>(() => {
     const requested = params.get("tab");
@@ -198,18 +200,18 @@ function Companion() {
   const triadQuality = current ? coreTriad(current.quality) : null;
 
   const tabOptions: { value: Tab; label: string; hint: string }[] = [
-    { value: "loop", label: recordingNow ? "● Looper" : "Looper", hint: "Record yourself, loop it, and add more lines" },
-    { value: "ideas", label: "Ideas", hint: "Triads, fills, melodies, rhythm and bass lines for your chords" },
-    { value: "listen", label: "Listen", hint: "Let the app hear your band's chords" },
+    { value: "loop", label: recordingNow ? "● Looper" : "Looper", hint: x("Record yourself, loop it, and add more lines") },
+    { value: "ideas", label: x("Ideas"), hint: x("Triads, fills, melodies, rhythm and bass lines for your chords") },
+    { value: "listen", label: x("Listen"), hint: x("Let the app hear your band's chords") },
   ];
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Guitar &amp; Bass Companion</h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{x("Guitar & Bass Companion")}</h1>
           <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">
-            Type the chords your band is playing, then practise over a loop, get ideas that fit, or let the app listen.
+            {x("Type the chords your band is playing, then practise over a loop, get ideas that fit, or let the app listen.")}
           </p>
         </div>
         <SoundMenu />
@@ -290,38 +292,38 @@ function Companion() {
 
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] px-4 py-3 text-sm">
             <span className="min-w-[200px] flex-1 text-[var(--color-ink-dim)]">
-              Ideas work best over real music. Record {progression.chords.map((c) => c.symbol).join(" ") || "your chords"} in the Looper and play these on top.
+              {x("Ideas work best over real music. Record {chords} in the Looper and play these on top.", { chords: progression.chords.map((c) => c.symbol).join(" ") || x("your chords") })}
             </span>
             <Button size="sm" onClick={() => { setTab("loop"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
-              Open the Looper →
+              {x("Open the Looper →")}
             </Button>
           </div>
 
           {current && (
             <Disclosure
-              title="How it fits together"
-              summary={`${progression.key.key?.name ?? "key uncertain"} → ${progression.chords.map((c) => c.symbol).join(" ")} → triad → target → fill → melody`}
+              title={x("How it fits together")}
+              summary={`${progression.key.key?.name ?? x("key uncertain")} → ${progression.chords.map((c) => c.symbol).join(" ")} → ${x("triad → target → fill → melody")}`}
             >
               <div className="flex flex-wrap items-stretch gap-1.5">
-                <Chain label="Key" value={progression.key.key?.name ?? "uncertain"} />
-                <Chain label="Scale" value={progression.key.key ? progression.key.key.notes.join(" ") : "–"} />
-                <Chain label="Progression" value={progression.chords.map((c) => c.symbol).join(" ")} />
-                <Chain label="Chord tones" value={current.names.join(" ")} onClick={() => choose("tones")} active={activeView === "tones"} />
+                <Chain label={x("Key")} value={progression.key.key?.name ?? x("uncertain")} />
+                <Chain label={x("Scale")} value={progression.key.key ? progression.key.key.notes.join(" ") : "–"} />
+                <Chain label={x("Progression")} value={progression.chords.map((c) => c.symbol).join(" ")} />
+                <Chain label={x("Chord tones")} value={current.names.join(" ")} onClick={() => choose("tones")} active={activeView === "tones"} />
                 <Chain
-                  label="Triad"
+                  label={x("Triad")}
                   value={triadQuality ? chordPitchClasses(current.root, triadQuality).map((pc) => spellPitchClass(pc, progression.key.key)).join(" ") : "–"}
                   onClick={() => choose("triads")}
                   active={activeView === "triads"}
                 />
-                <Chain label="Target" value={summary?.target.name ?? "–"} onClick={() => choose("tones")} />
-                <Chain label="Fill" value="into the next chord" onClick={() => choose(instrument === "bass" ? "bass-fills" : "fills")} active={activeView === "fills" || activeView === "bass-fills"} />
-                <Chain label="Melody" value="through every chord" onClick={() => choose(instrument === "bass" ? "bass-melodic" : "lead")} active={activeView === "lead" || activeView === "bass-melodic"} />
+                <Chain label={x("Target")} value={summary?.target.name ?? "–"} onClick={() => choose("tones")} />
+                <Chain label={x("Fill")} value={x("into the next chord")} onClick={() => choose(instrument === "bass" ? "bass-fills" : "fills")} active={activeView === "fills" || activeView === "bass-fills"} />
+                <Chain label={x("Melody")} value={x("through every chord")} onClick={() => choose(instrument === "bass" ? "bass-melodic" : "lead")} active={activeView === "lead" || activeView === "bass-melodic"} />
               </div>
             </Disclosure>
           )}
 
           <div id="ideas-views" className="scroll-mt-20" />
-          <Panel title="What can I play?">
+          <Panel title={x("What can I play?")}>
             <div className="flex flex-wrap gap-2">
               {views.map((item) => (
                 <button
@@ -334,7 +336,7 @@ function Companion() {
                       : "border-[var(--color-hairline)] bg-[var(--color-void)] text-[var(--color-ink-dim)] hover:border-[var(--color-hairline-bright)]",
                   )}
                 >
-                  {item.label}
+                  {x(item.label)}
                 </button>
               ))}
             </div>
@@ -378,15 +380,15 @@ function Companion() {
 
       {tab === "listen" && (
         <LiveChordPanel
-          title="Let the app hear your chords"
+          title={x("Let the app hear your chords")}
           activeKey={progression.key.key}
           onChord={onHeard}
           footer={
             <div className="flex flex-col gap-3 border-t border-[var(--color-hairline)] pt-4">
-              <p className="hud-label">Chords heard</p>
+              <p className="hud-label">{x("Chords heard")}</p>
               {heard.length === 0 ? (
                 <p className="text-xs text-[var(--color-ink-faint)]">
-                  Start listening and play. Each new chord is added here, then you can use them as your progression.
+                  {x("Start listening and play. Each new chord is added here, then you can use them as your progression.")}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -399,10 +401,10 @@ function Companion() {
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="primary" disabled={heard.length === 0} onClick={() => useHeard(4)}>
-                  Use last 4 as my progression
+                  {x("Use last 4 as my progression")}
                 </Button>
                 <Button size="sm" disabled={heard.length === 0} onClick={() => useHeard(8)}>
-                  Use last 8
+                  {x("Use last 8")}
                 </Button>
                 <Button
                   size="sm"
@@ -414,21 +416,21 @@ function Companion() {
                     setApplied(false);
                   }}
                 >
-                  Clear
+                  {x("Clear")}
                 </Button>
                 <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-[var(--color-ink-dim)]">
                   <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} className="accent-[var(--color-signal)]" />
-                  Follow live: always use the last 4 chords
+                  {x("Follow live: always use the last 4 chords")}
                 </label>
               </div>
               {applied && (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#39e08b] bg-[rgba(57,224,139,0.08)] px-4 py-3 text-sm">
-                  <span className="text-[#39e08b]">✓ Progression set to {progression.chords.map((c) => c.symbol).join(" ")}.</span>
+                  <span className="text-[#39e08b]">{x("✓ Progression set to {chords}.", { chords: progression.chords.map((c) => c.symbol).join(" ") })}</span>
                   <Button size="sm" onClick={() => setTab("ideas")}>
-                    See ideas →
+                    {x("See ideas →")}
                   </Button>
                   <Button size="sm" onClick={() => setTab("loop")}>
-                    Record over it →
+                    {x("Record over it →")}
                   </Button>
                 </div>
               )}

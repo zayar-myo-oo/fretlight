@@ -21,6 +21,7 @@ import { useLoopClock } from "@/hooks/useLooper";
 import { type AudioInputDevice, listInputs, watchDevices } from "@/lib/audio/audio-input";
 import type { LooperEngine, LooperState, TrackKind } from "@/lib/looper/looper-engine";
 import { type StoredSession, clearSession, loadSession, saveSession } from "@/lib/looper/session-store";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 import { useSession } from "@/store/session";
 
@@ -63,6 +64,7 @@ function Meter({ engine, active, large }: { engine: LooperEngine; active: boolea
   const bars = useRef<HTMLDivElement>(null);
   const [clipping, setClipping] = useState(false);
   const [signal, setSignal] = useState(false);
+  const x = useTx();
   useEffect(() => {
     if (!active) return;
     let frame = 0;
@@ -91,7 +93,7 @@ function Meter({ engine, active, large }: { engine: LooperEngine; active: boolea
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div ref={bars} className={cn("flex items-end gap-0.5", large ? "h-10" : "h-6")} aria-label="Input level">
+      <div ref={bars} className={cn("flex items-end gap-0.5", large ? "h-10" : "h-6")} aria-label={x("Input level")}>
         {Array.from({ length: 24 }, (_, i) => (
           <div
             key={i}
@@ -101,10 +103,10 @@ function Meter({ engine, active, large }: { engine: LooperEngine; active: boolea
         ))}
       </div>
       {clipping ? (
-        <p className="text-xs font-medium text-[var(--color-error)]">Too loud (red). Lower the input gain, or the gain knob on your interface.</p>
+        <p className="text-xs font-medium text-[var(--color-error)]">{x("Too loud (red). Lower the input gain, or the gain knob on your interface.")}</p>
       ) : large ? (
         <p className="text-xs text-[var(--color-ink-dim)]">
-          {signal ? "✓ I can hear you. Aim for the green and yellow, not the red." : "Play a note or a chord: the bars should move."}
+          {x(signal ? "✓ I can hear you. Aim for the green and yellow, not the red." : "Play a note or a chord: the bars should move.")}
         </p>
       ) : null}
     </div>
@@ -154,6 +156,7 @@ export function LooperPanel({
   selectedChord: number;
 }) {
   const bpm = useSession((s) => s.bpm);
+  const x = useTx();
   const setBpm = useSession((s) => s.setBpm);
   const timeSignature = useSession((s) => s.timeSignature);
   const patchSession = useSession((s) => s.patch);
@@ -185,7 +188,7 @@ export function LooperPanel({
   useEffect(() => {
     if (tracks.length > previousCount.current && previousCount.current >= 0 && !recordingNow) {
       const last = tracks[tracks.length - 1]!;
-      setNotice(previousCount.current === 0 ? `✓ Recorded. “${last.name}” is now looping.` : `✓ “${last.name}” added to the loop.`);
+      setNotice(previousCount.current === 0 ? x("✓ Recorded. “{name}” is now looping.", { name: last.name }) : x("✓ “{name}” added to the loop.", { name: last.name }));
       const timer = setTimeout(() => setNotice(null), 6000);
       previousCount.current = tracks.length;
       return () => clearTimeout(timer);
@@ -204,7 +207,7 @@ export function LooperPanel({
 
   const nameFor = (kind: TrackKind) => {
     const same = tracks.filter((t) => t.kind === kind).length;
-    return same ? `${KIND_LABELS[kind]} ${same + 1}` : KIND_LABELS[kind];
+    return same ? `${x(KIND_LABELS[kind])} ${same + 1}` : x(KIND_LABELS[kind]);
   };
 
   const startRecording = () => {
@@ -275,21 +278,27 @@ export function LooperPanel({
   });
 
   const gateOptions: { value: GateLevel; label: string }[] = [
-    { value: "off", label: "Off" },
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium" },
-    { value: "high", label: "High" },
+    { value: "off", label: x("Off") },
+    { value: "low", label: x("Low") },
+    { value: "medium", label: x("Medium") },
+    { value: "high", label: x("High") },
   ];
   const focusKind: TrackKind = recording?.kind ?? newKind;
   const stage: "connect" | "ready" | "loop" = hasLoop ? "loop" : state.inputReady ? "ready" : "connect";
 
-  const settingsSummary = `${shownBpm} BPM · ${timeSignature.beats}/4 · count-in ${settings.countInBars === 0 ? "off" : `${settings.countInBars} bar${settings.countInBars > 1 ? "s" : ""}`} · ${settings.loopMode === "musical" ? "whole bars" : "free length"} · click ${settings.metronome ? "on" : "off"}`;
-  const inputSummary = `${settings.deviceId ? "chosen input" : "default input"} · gate ${settings.gate} · gain ${Math.round(settings.inputGain * 100)}%`;
+  const settingsSummary = x("{bpm} BPM · {beats}/4 · count-in {countIn} · {mode} · click {click}", {
+    bpm: shownBpm,
+    beats: timeSignature.beats,
+    countIn: settings.countInBars === 0 ? x("off") : x(settings.countInBars > 1 ? "{n} bars" : "{n} bar", { n: settings.countInBars }),
+    mode: x(settings.loopMode === "musical" ? "whole bars" : "free length"),
+    click: x(settings.metronome ? "on" : "off"),
+  });
+  const inputSummary = x("{device} · gate {gate} · gain {gain}%", { device: x(settings.deviceId ? "chosen input" : "default input"), gate: x(settings.gate), gain: Math.round(settings.inputGain * 100) });
 
   const settingsControls = (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label={`Tempo · ${shownBpm} BPM`}>
+        <Field label={x("Tempo · {bpm} BPM", { bpm: shownBpm })}>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -298,7 +307,7 @@ export function LooperPanel({
               value={shownBpm}
               disabled={hasLoop || recordingNow}
               onChange={(e) => setBpm(Number(e.target.value))}
-              aria-label="Tempo"
+              aria-label={x("Tempo")}
               className="min-w-0 flex-1 accent-[var(--color-signal)] disabled:opacity-40"
             />
             <Button
@@ -313,10 +322,10 @@ export function LooperPanel({
             </Button>
           </div>
           <span className="text-[11px] text-[var(--color-ink-faint)]">
-            {hasLoop ? "Locked to the loop. Clear all to change it." : "Not sure? Tap along with the song, four or more times."}
+            {x(hasLoop ? "Locked to the loop. Clear all to change it." : "Not sure? Tap along with the song, four or more times.")}
           </span>
         </Field>
-        <Field label="Time signature">
+        <Field label={x("Time signature")}>
           <select
             value={timeSignature.beats}
             disabled={hasLoop || recordingNow}
@@ -330,39 +339,39 @@ export function LooperPanel({
             ))}
           </select>
         </Field>
-        <Field label="Count-in before recording">
+        <Field label={x("Count-in before recording")}>
           <SegmentedControl
             size="sm"
             options={[
-              { value: "0", label: "Off" },
-              { value: "1", label: "1 bar" },
-              { value: "2", label: "2 bars" },
+              { value: "0", label: x("Off") },
+              { value: "1", label: x("1 bar") },
+              { value: "2", label: x("2 bars") },
             ]}
             value={String(settings.countInBars)}
             onChange={(v) => engine.configure({ countInBars: Number(v) as 0 | 1 | 2 })}
           />
         </Field>
-        <Field label="Loop length">
+        <Field label={x("Loop length")}>
           <SegmentedControl
             size="sm"
             options={[
-              { value: "musical", label: "Whole bars", hint: "Rounds your first take to whole bars, so it stays in time with the click" },
-              { value: "free", label: "Free", hint: "Uses exactly what you recorded; the click turns off after the first take" },
+              { value: "musical", label: x("Whole bars"), hint: x("Rounds your first take to whole bars, so it stays in time with the click") },
+              { value: "free", label: x("Free"), hint: x("Uses exactly what you recorded; the click turns off after the first take") },
             ]}
             value={settings.loopMode}
             onChange={(v) => !hasLoop && engine.configure({ loopMode: v as "musical" | "free" })}
           />
         </Field>
       </div>
-      <Toggle label="Metronome click while the loop plays" checked={settings.metronome} onChange={(v) => engine.configure({ metronome: v })} />
-      <Toggle label="Keep my loop on this device after a refresh (stored in this browser only)" checked={keep} onChange={setKeepOnDevice} />
+      <Toggle label={x("Metronome click while the loop plays")} checked={settings.metronome} onChange={(v) => engine.configure({ metronome: v })} />
+      <Toggle label={x("Keep my loop on this device after a refresh (stored in this browser only)")} checked={keep} onChange={setKeepOnDevice} />
     </div>
   );
 
   const inputControls = (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Input device">
+        <Field label={x("Input device")}>
           <select
             value={settings.deviceId}
             onChange={(e) => {
@@ -371,7 +380,7 @@ export function LooperPanel({
             }}
             className="h-9 rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-3 text-xs"
           >
-            <option value="">Default input</option>
+            <option value="">{x("Default input")}</option>
             {devices
               .filter((d) => d.deviceId && d.deviceId !== "default")
               .map((d) => (
@@ -381,13 +390,13 @@ export function LooperPanel({
               ))}
           </select>
         </Field>
-        <Field label="Noise gate">
+        <Field label={x("Noise gate")}>
           <SegmentedControl size="sm" options={gateOptions} value={settings.gate} onChange={(v) => engine.configure({ gate: v })} />
           <span className="text-[11px] text-[var(--color-ink-faint)]">
-            {GATE_THRESHOLDS[settings.gate] === 0 ? "Everything passes." : "Silences hiss and hum between notes. Raise it if you still hear noise."}
+            {x(GATE_THRESHOLDS[settings.gate] === 0 ? "Everything passes." : "Silences hiss and hum between notes. Raise it if you still hear noise.")}
           </span>
         </Field>
-        <Field label={`Input gain · ${Math.round(settings.inputGain * 100)}%`}>
+        <Field label={x("Input gain · {gain}%", { gain: Math.round(settings.inputGain * 100) })}>
           <input
             type="range"
             min={0.1}
@@ -395,16 +404,16 @@ export function LooperPanel({
             step={0.05}
             value={settings.inputGain}
             onChange={(e) => engine.configure({ inputGain: Number(e.target.value) })}
-            aria-label="Input gain"
+            aria-label={x("Input gain")}
             className="accent-[var(--color-signal)]"
           />
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <Toggle label="Hear myself (headphones only)" checked={settings.monitor} onChange={(v) => engine.configure({ monitor: v })} />
-        <Toggle label="Gentle compressor" checked={settings.compressor} onChange={(v) => engine.configure({ compressor: v })} />
+        <Toggle label={x("Hear myself (headphones only)")} checked={settings.monitor} onChange={(v) => engine.configure({ monitor: v })} />
+        <Toggle label={x("Gentle compressor")} checked={settings.compressor} onChange={(v) => engine.configure({ compressor: v })} />
       </div>
-      <Field label={`Timing adjustment · ${settings.latencyMs} ms`}>
+      <Field label={x("Timing adjustment · {ms} ms", { ms: settings.latencyMs })}>
         <input
           type="range"
           min={0}
@@ -415,7 +424,7 @@ export function LooperPanel({
           className="accent-[var(--color-signal)]"
         />
         <span className="text-[11px] text-[var(--color-ink-faint)]">
-          New lines can land a little late (your interface and browser add delay). If a line sounds behind the beat, raise this; if it is ahead, lower it.
+          {x("New lines can land a little late (your interface and browser add delay). If a line sounds behind the beat, raise this; if it is ahead, lower it.")}
         </span>
       </Field>
     </div>
@@ -425,15 +434,15 @@ export function LooperPanel({
     <div className="flex flex-col gap-6">
       <Panel
         title="Looper"
-        meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Recordings stay in your browser and are never uploaded.</span>}
+        meta={<span className="text-[11px] text-[var(--color-ink-faint)]">{x("Recordings stay in your browser and are never uploaded.")}</span>}
       >
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <Step n={1} label="Connect your guitar" state={stage === "connect" ? "now" : "done"} />
+            <Step n={1} label={x("Connect your guitar")} state={stage === "connect" ? "now" : "done"} />
             <span className="hidden text-[var(--color-ink-faint)] sm:block">→</span>
-            <Step n={2} label="Record a first line" state={stage === "connect" ? "todo" : stage === "ready" ? "now" : "done"} />
+            <Step n={2} label={x("Record a first line")} state={stage === "connect" ? "todo" : stage === "ready" ? "now" : "done"} />
             <span className="hidden text-[var(--color-ink-faint)] sm:block">→</span>
-            <Step n={3} label="Layer more lines" state={stage === "loop" ? "now" : "todo"} />
+            <Step n={3} label={x("Layer more lines")} state={stage === "loop" ? "now" : "todo"} />
           </div>
 
           {notice && (
@@ -441,19 +450,23 @@ export function LooperPanel({
               {notice}
             </p>
           )}
-          {state.error && <p className="rounded-xl border border-[var(--color-error)] px-4 py-2.5 text-sm text-[var(--color-error)]">{state.error}</p>}
+          {state.error && <p className="rounded-xl border border-[var(--color-error)] px-4 py-2.5 text-sm text-[var(--color-error)]">{x(state.error)}</p>}
 
           {restorable && tracks.length === 0 && !recordingNow && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--color-theory)] bg-[rgba(139,124,255,0.08)] px-4 py-3 text-sm">
               <span className="min-w-[200px] flex-1">
-                Your last loop is saved on this device: {restorable.tracks.length} line{restorable.tracks.length === 1 ? "" : "s"}, {Math.round(restorable.bars)} bars at {restorable.bpm} BPM
-                ({new Date(restorable.savedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}).
+                {x("Your last loop is saved on this device: {lines}, {bars} bars at {bpm} BPM ({date}).", {
+                  lines: x(restorable.tracks.length === 1 ? "{n} line" : "{n} lines", { n: restorable.tracks.length }),
+                  bars: Math.round(restorable.bars),
+                  bpm: restorable.bpm,
+                  date: new Date(restorable.savedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+                })}
               </span>
               <Button size="sm" variant="primary" onClick={() => { const saved = restorable; setRestorable(null); void engine.importSession(saved); }}>
-                Restore it
+                {x("Restore it")}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => { setRestorable(null); void clearSession(); }}>
-                Discard
+                {x("Discard")}
               </Button>
             </div>
           )}
@@ -461,13 +474,12 @@ export function LooperPanel({
           {/* ----------------------------------------------------- 1: connect */}
           {stage === "connect" && (
             <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-[var(--color-hairline-bright)] bg-[var(--color-void)] p-6">
-              <p className="text-base font-medium">Turn on your input to begin</p>
+              <p className="text-base font-medium">{x("Turn on your input to begin")}</p>
               <p className="max-w-xl text-sm leading-relaxed text-[var(--color-ink-dim)]">
-                Plug in your guitar or bass (through an audio interface) or use a microphone. Your browser will ask for permission. Nothing is recorded
-                until you press Record.
+                {x("Plug in your guitar or bass (through an audio interface) or use a microphone. Your browser will ask for permission. Nothing is recorded until you press Record.")}
               </p>
               <Button size="lg" variant="primary" onClick={() => void engine.enableInput()}>
-                Turn on input
+                {x("Turn on input")}
               </Button>
             </div>
           )}
@@ -476,20 +488,20 @@ export function LooperPanel({
           {stage === "ready" && !recordingNow && (
             <div className="flex flex-col gap-4 rounded-2xl border border-[var(--color-signal)] bg-[rgba(34,224,214,0.05)] p-5">
               <div>
-                <p className="text-base font-medium">Check your level, then record</p>
+                <p className="text-base font-medium">{x("Check your level, then record")}</p>
                 <ol className="mt-1 list-inside list-decimal text-sm leading-relaxed text-[var(--color-ink-dim)]">
-                  <li>Play a chord. The bars below should move.</li>
-                  <li>Press Record. After the count-in, play your chords.</li>
-                  <li>Press Stop when you are done. That line becomes the loop.</li>
+                  <li>{x("Play a chord. The bars below should move.")}</li>
+                  <li>{x("Press Record. After the count-in, play your chords.")}</li>
+                  <li>{x("Press Stop when you are done. That line becomes the loop.")}</li>
                 </ol>
               </div>
               <Meter engine={engine} active large />
               <div className="flex flex-wrap items-center gap-3">
                 <Button size="lg" variant="danger" onClick={startRecording}>
-                  ● Record
+                  {x("● Record")}
                 </Button>
                 <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-                  This line is
+                  {x("This line is")}
                   <select
                     value={newKind}
                     onChange={(e) => setNewKind(e.target.value as TrackKind)}
@@ -497,7 +509,7 @@ export function LooperPanel({
                   >
                     {(Object.keys(KIND_LABELS) as TrackKind[]).map((k) => (
                       <option key={k} value={k}>
-                        {KIND_LABELS[k]}
+                        {x(KIND_LABELS[k])}
                       </option>
                     ))}
                   </select>
@@ -512,41 +524,41 @@ export function LooperPanel({
               <div className="flex flex-wrap items-center gap-2">
                 {running ? (
                   <Button size="lg" onClick={() => engine.pause()}>
-                    ⏸ Pause
+                    {x("⏸ Pause")}
                   </Button>
                 ) : (
                   <Button size="lg" variant="primary" onClick={() => engine.startPlayback()} disabled={recordingNow}>
-                    ▶ Play loop
+                    {x("▶ Play loop")}
                   </Button>
                 )}
                 <Button size="lg" onClick={() => engine.stop()} disabled={!running && phase !== "paused"}>
-                  ■ Stop
+                  {x("■ Stop")}
                 </Button>
                 <Button size="lg" variant="ghost" onClick={() => engine.restart()} disabled={recordingNow}>
-                  ↺ Restart
+                  {x("↺ Restart")}
                 </Button>
                 <span className="mx-1 hidden h-8 w-px bg-[var(--color-hairline)] sm:block" />
                 <Button size="sm" variant="ghost" onClick={() => engine.undo()} disabled={!state.canUndo || recordingNow}>
-                  ↶ Undo
+                  {x("↶ Undo")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => engine.redo()} disabled={!state.canRedo || recordingNow}>
-                  ↷ Redo
+                  {x("↷ Redo")}
                 </Button>
                 <div className="ml-auto text-right">
                   <p className="readout text-lg">
-                    {clock.bar > 0 ? `Bar ${clock.bar} / ${clock.totalBars} · Beat ${clock.beat}` : `${Math.round(bars ?? 0)} bars`}
+                    {clock.bar > 0 ? x("Bar {bar} / {total} · Beat {beat}", { bar: clock.bar, total: clock.totalBars, beat: clock.beat }) : x("{n} bars", { n: Math.round(bars ?? 0) })}
                   </p>
                   <p className="text-[11px] text-[var(--color-ink-faint)]">
-                    {running ? "Loop is on" : phase === "paused" ? "Paused" : "Stopped"} · {loopSeconds!.toFixed(1)} s
+                    {x(running ? "Loop is on" : phase === "paused" ? "Paused" : "Stopped")} · {loopSeconds!.toFixed(1)} s
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-hairline)] pt-4">
                 <Button size="lg" variant="danger" onClick={startRecording} disabled={recordingNow}>
-                  ● Record a new line
+                  {x("● Record a new line")}
                 </Button>
                 <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-                  Line type
+                  {x("Line type")}
                   <select
                     value={newKind}
                     onChange={(e) => setNewKind(e.target.value as TrackKind)}
@@ -554,21 +566,21 @@ export function LooperPanel({
                   >
                     {(Object.keys(KIND_LABELS) as TrackKind[]).map((k) => (
                       <option key={k} value={k}>
-                        {KIND_LABELS[k]}
+                        {x(KIND_LABELS[k])}
                       </option>
                     ))}
                   </select>
                 </label>
-                <p className="text-xs text-[var(--color-ink-faint)]">It plays the loop, counts you in, and records one full loop.</p>
+                <p className="text-xs text-[var(--color-ink-faint)]">{x("It plays the loop, counts you in, and records one full loop.")}</p>
               </div>
-              <p className="text-[11px] text-[var(--color-ink-faint)]">Keys: Space play / pause · R record / stop · Esc stop</p>
+              <p className="text-[11px] text-[var(--color-ink-faint)]">{x("Keys: Space play / pause · R record / stop · Esc stop")}</p>
             </div>
           )}
 
-          <Disclosure title="Settings" summary={settingsSummary}>
+          <Disclosure title={x("Settings")} summary={settingsSummary}>
             {settingsControls}
           </Disclosure>
-          <Disclosure title="Input" summary={state.inputReady ? inputSummary : "not connected yet"}>
+          <Disclosure title={x("Input")} summary={state.inputReady ? inputSummary : x("not connected yet")}>
             <div className="flex flex-col gap-4">
               {state.inputReady && <Meter engine={engine} active large />}
               {inputControls}
@@ -580,11 +592,11 @@ export function LooperPanel({
       {/* ---------------------------------------------------------------- lines */}
       {hasLoop && (
         <Panel
-          title={`Lines (${tracks.length})`}
+          title={x("Lines ({n})", { n: tracks.length })}
           meta={
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-                Master
+                {x("Master")}
                 <input
                   type="range"
                   min={0}
@@ -592,25 +604,25 @@ export function LooperPanel({
                   step={0.05}
                   value={settings.masterVolume}
                   onChange={(e) => engine.configure({ masterVolume: Number(e.target.value) })}
-                  aria-label="Master volume"
+                  aria-label={x("Master volume")}
                   className="w-24 accent-[var(--color-signal)]"
                 />
               </label>
               <Button size="sm" onClick={() => { const bytes = engine.mixWav(1); if (bytes) download(bytes, "fretlight-mix.wav"); }}>
-                ↓ Download mix
+                {x("↓ Download mix")}
               </Button>
               {confirmClear ? (
                 <>
                   <Button size="sm" variant="danger" onClick={() => { engine.clearAll(); setConfirmClear(false); }}>
-                    Yes, clear everything
+                    {x("Yes, clear everything")}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setConfirmClear(false)}>
-                    Keep
+                    {x("Keep")}
                   </Button>
                 </>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => setConfirmClear(true)} disabled={recordingNow}>
-                  Clear all
+                  {x("Clear all")}
                 </Button>
               )}
             </div>
@@ -619,7 +631,7 @@ export function LooperPanel({
           <div className="flex flex-col gap-3">
             {barChords.length > 0 && loopSeconds && (
               <div className="grid gap-3 md:grid-cols-[260px_1fr]">
-                <p className="hud-label self-center">Bars and chords</p>
+                <p className="hud-label self-center">{x("Bars and chords")}</p>
                 <div className="relative flex overflow-hidden rounded-lg border border-[var(--color-hairline)]">
                   {barChords.map((symbol, i) => (
                     <div

@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useMounted } from "@/hooks/useMounted";
 import { MESSAGES, type Locale, type MessageKey } from "./messages";
+import { PHRASES_MY, RULES_MY } from "./phrases-my";
 
 export type { Locale, MessageKey } from "./messages";
 
@@ -44,6 +45,56 @@ export function useLocale(): Locale {
 export function useT(): Translate {
   const locale = useLocale();
   return useCallback<Translate>((key, vars) => translate(locale, key, vars), [locale]);
+}
+
+export type Tx = (text: string, vars?: Record<string, string | number>) => string;
+
+const fill = (template: string, vars?: Record<string, string | number>) =>
+  vars ? template.replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match)) : template;
+
+function sentenceMy(sentence: string): string | null {
+  const exact = PHRASES_MY[sentence];
+  if (exact !== undefined) return exact;
+  for (const [pattern, build] of RULES_MY) {
+    const match = sentence.match(pattern);
+    if (match) return build(...match);
+  }
+  return null;
+}
+
+/**
+ * Translate a phrase written in English, the way the Companion's UI and the
+ * core engine's generated explanations are. Whole-text matches win; otherwise
+ * the text is split into sentences and the longest run of sentences with a
+ * translation is used at each point, so a fixed tip appended to a generated
+ * sentence is still translated. Untranslated sentences stay in English.
+ */
+export function localize(locale: Locale, text: string, vars?: Record<string, string | number>): string {
+  if (locale === "en" || !text) return fill(text, vars);
+  const whole = sentenceMy(text);
+  if (whole !== null) return fill(whole, vars);
+  const parts = text.split(/(?<=[.!?])\s+/);
+  if (parts.length === 1) return fill(text, vars);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; ) {
+    let done = false;
+    for (let j = parts.length; j > i; j--) {
+      const translated = sentenceMy(parts.slice(i, j).join(" "));
+      if (translated !== null) {
+        out.push(translated);
+        i = j;
+        done = true;
+        break;
+      }
+    }
+    if (!done) out.push(parts[i++]!);
+  }
+  return fill(out.join(" "), vars);
+}
+
+export function useTx(): Tx {
+  const locale = useLocale();
+  return useCallback<Tx>((text, vars) => localize(locale, text, vars), [locale]);
 }
 
 /** Keeps `<html lang>` in step with the chosen language (screen readers and font fallback use it). */

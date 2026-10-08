@@ -11,6 +11,7 @@ import {
 } from "@fretlight/core";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 const PRESETS = ["C G Am F", "G D Em C", "Am F C G", "Cmaj7 Am7 Fmaj7 G7"];
@@ -41,14 +42,15 @@ export function ProgressionPanel({
   onDifficulty: (value: Difficulty) => void;
 }) {
   const key = progression.key;
+  const x = useTx();
   const profile = STYLE_PROFILES[style];
 
   return (
-    <Panel title="Your progression">
+    <Panel title={x("Your progression")}>
       <div className="flex flex-col gap-5">
         <div>
           <label className="hud-label mb-1.5 block" htmlFor="progression">
-            Chords the band is playing
+            {x("Chords the band is playing")}
           </label>
           <input
             id="progression"
@@ -70,7 +72,7 @@ export function ProgressionPanel({
           </div>
           {progression.errors.length > 0 && (
             <p className="mt-2 text-xs text-[var(--color-error)]">
-              Couldn&apos;t read: {progression.errors.join(", ")}. Try names like C, Am, F#m7, Bbmaj7, Gsus4.
+              {x("Couldn't read: {list}. Try names like C, Am, F#m7, Bbmaj7, Gsus4.", { list: progression.errors.join(", ") })}
             </p>
           )}
         </div>
@@ -95,37 +97,37 @@ export function ProgressionPanel({
               ))}
             </div>
             <div className="min-w-[180px]">
-              <p className="hud-label">Key</p>
+              <p className="hud-label">{x("Key")}</p>
               {key.key ? (
                 <>
                   <p className="readout text-lg font-semibold text-[var(--color-signal)]">{key.key.name}</p>
                   <p className="text-xs text-[var(--color-ink-dim)]">
-                    Confidence: {key.level}
-                    {key.relative && key.level !== "High" ? ` · could also be ${key.relative.name}` : ""}
+                    {x("Confidence: {level}", { level: x(key.level ?? "") })}
+                    {key.relative && key.level !== "High" ? x(" · could also be {key}", { key: key.relative.name }) : ""}
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-[var(--color-ink-dim)]">Key uncertain. Ideas use the notes of your chords.</p>
+                <p className="text-sm text-[var(--color-ink-dim)]">{x("Key uncertain. Ideas use the notes of your chords.")}</p>
               )}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[var(--color-ink-dim)]">Type at least one chord to start.</p>
+          <p className="text-sm text-[var(--color-ink-dim)]">{x("Type at least one chord to start.")}</p>
         )}
 
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-          <Field label="Instrument">
+          <Field label={x("Instrument")}>
             <SegmentedControl
               size="sm"
               options={[
-                { value: "guitar", label: "Guitar" },
-                { value: "bass", label: "Bass" },
+                { value: "guitar", label: x("Guitar") },
+                { value: "bass", label: x("Bass") },
               ]}
               value={instrument}
               onChange={onInstrument}
             />
           </Field>
-          <Field label="Style">
+          <Field label={x("Style")}>
             <select
               value={style}
               onChange={(e) => onStyle(e.target.value as CompanionStyle)}
@@ -138,10 +140,10 @@ export function ProgressionPanel({
               ))}
             </select>
           </Field>
-          <Field label="Difficulty">
+          <Field label={x("Difficulty")}>
             <SegmentedControl
               size="sm"
-              options={DIFFICULTIES.map((d) => ({ value: d, label: d[0]!.toUpperCase() + d.slice(1), hint: DIFFICULTY_INFO[d] }))}
+              options={DIFFICULTIES.map((d) => ({ value: d, label: x(d[0]!.toUpperCase() + d.slice(1)), hint: x(DIFFICULTY_INFO[d]) }))}
               value={difficulty}
               onChange={onDifficulty}
             />
@@ -149,7 +151,7 @@ export function ProgressionPanel({
         </div>
 
         <p className="text-xs leading-relaxed text-[var(--color-ink-faint)]">
-          <span className="text-[var(--color-ink-dim)]">{profile.label}:</span> {profile.blurb} {DIFFICULTY_INFO[difficulty]}
+          <span className="text-[var(--color-ink-dim)]">{profile.label}:</span> {x(profile.blurb)} {x(DIFFICULTY_INFO[difficulty])}
         </p>
       </div>
     </Panel>

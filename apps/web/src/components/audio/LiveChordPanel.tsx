@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { type AudioInputDevice, classifyDevice, listInputs, watchDevices } from "@/lib/audio/audio-input";
 import { ChordListener, type ChordFrame } from "@/lib/audio/chord-listener";
+import { useTx } from "@/lib/i18n/locale";
 
 function describeError(error: unknown): string {
   const name = error instanceof DOMException ? error.name : "";
@@ -34,6 +35,7 @@ export function LiveChordPanel({
   title?: string;
 }) {
   const listener = useRef<ChordListener | null>(null);
+  const x = useTx();
   const lastSymbol = useRef<string | null>(null);
   const onChordRef = useRef(onChord);
   onChordRef.current = onChord;
@@ -103,18 +105,18 @@ export function LiveChordPanel({
   return (
     <Panel
       title={title}
-      meta={<Badge tone={running ? "theory" : "neutral"}>{running ? "Listening" : "Off"}</Badge>}
+      meta={<Badge tone={running ? "theory" : "neutral"}>{x(running ? "Listening" : "Off")}</Badge>}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2">
-            <span className="hud-label">Input</span>
+            <span className="hud-label">{x("Input")}</span>
             <select
               value={deviceId}
               onChange={(e) => onDevice(e.target.value)}
               className="h-9 min-w-[180px] max-w-[260px] rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-3 text-xs text-[var(--color-ink-dim)]"
             >
-              <option value="">Default input</option>
+              <option value="">{x("Default input")}</option>
               {devices
                 .filter((d) => d.deviceId && d.deviceId !== "default")
                 .map((d) => (
@@ -127,21 +129,20 @@ export function LiveChordPanel({
           </label>
           {running ? (
             <Button size="sm" onClick={() => void stop()}>
-              ■ Stop listening
+              {x("■ Stop listening")}
             </Button>
           ) : (
             <Button size="sm" variant="primary" onClick={() => void start()}>
-              ● Start listening
+              {x("● Start listening")}
             </Button>
           )}
         </div>
 
-        {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
+        {error && <p className="text-sm text-[var(--color-error)]">{x(error)}</p>}
 
         {!running && !error && (
           <p className="text-xs leading-relaxed text-[var(--color-ink-dim)]">
-            Plug in your guitar or bass interface (or use a microphone), press Start, and
-            strum a chord. Everything is analysed on this device; no audio is recorded or sent.
+            {x("Plug in your guitar or bass interface (or use a microphone), press Start, and strum a chord. Everything is analysed on this device; no audio is recorded or sent.")}
           </p>
         )}
 
@@ -155,37 +156,37 @@ export function LiveChordPanel({
             </div>
 
             <div>
-              <span className="hud-label">Detected chord</span>
+              <span className="hud-label">{x("Detected chord")}</span>
               {chord ? (
                 <div className="mt-1 flex flex-wrap items-baseline gap-3">
                   <span className="readout text-3xl font-semibold text-[var(--color-signal)]">{chord.symbol}</span>
                   <span className="readout text-xs text-[var(--color-ink-dim)]">
-                    Confidence {Math.round(chord.confidence * 100)}%
+                    {x("Confidence {n}%", { n: Math.round(chord.confidence * 100) })}
                   </span>
                 </div>
               ) : (
                 <p className="mt-1 text-sm text-[var(--color-ink-faint)]">
-                  {frame?.active ? "Listening…" : "No chord detected. Play a chord, or check the input level."}
+                  {x(frame?.active ? "Listening…" : "No chord detected. Play a chord, or check the input level.")}
                 </p>
               )}
             </div>
 
             {frame && frame.notes.length > 0 && (
               <div>
-                <span className="hud-label">Detected notes</span>
+                <span className="hud-label">{x("Detected notes")}</span>
                 <p className="readout mt-1 text-sm">{frame.notes.map((pc) => SHARP_NAMES[pc]).join(" ")}</p>
               </div>
             )}
 
             {chord && (
               <div>
-                <span className="hud-label">Key context</span>
+                <span className="hud-label">{x("Key context")}</span>
                 <p className="readout mt-1 text-sm">
                   {activeKey
                     ? numeral
-                      ? `${numeral.roman} in ${activeKey.name}`
-                      : `Not diatonic to ${activeKey.name}`
-                    : "Choose or detect a key to see the Roman numeral"}
+                      ? x("{numeral} in {key}", { numeral: numeral.roman, key: activeKey.name })
+                      : x("Not diatonic to {key}", { key: activeKey.name })
+                    : x("Choose or detect a key to see the Roman numeral")}
                 </p>
               </div>
             )}

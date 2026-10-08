@@ -29,6 +29,7 @@ import { useCompanionBoard } from "@/hooks/useCompanionBoard";
 import { buildIdeaEvents, playEvents, stopCompanion } from "@/lib/audio/companion-player";
 import { ideaMarkers, pitchClassMarkers } from "@/lib/companion/markers";
 import type { TrackKind } from "@/lib/looper/looper-engine";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 type Layer = "tones" | "triad" | "cowboy" | "target" | "fill";
@@ -73,6 +74,7 @@ export function NowPanel({
   focusKind: TrackKind;
 }) {
   const [layer, setLayer] = useState<Layer>("triad");
+  const x = useTx();
   const [showTab, setShowTab] = useState(false);
   const bassBoard = useCompanionBoard("bass");
 
@@ -156,27 +158,27 @@ export function NowPanel({
 
   return (
     <Panel
-      title="What can I play now?"
-      meta={<span className={cn("readout rounded-full border px-2.5 py-0.5 text-[11px]", running ? "border-[var(--color-signal)] text-[var(--color-signal)]" : "border-[var(--color-hairline)] text-[var(--color-ink-faint)]")}>{running ? "following the loop" : "pick a chord below, or press play"}</span>}
+      title={x("What can I play now?")}
+      meta={<span className={cn("readout rounded-full border px-2.5 py-0.5 text-[11px]", running ? "border-[var(--color-signal)] text-[var(--color-signal)]" : "border-[var(--color-hairline)] text-[var(--color-ink-faint)]")}>{x(running ? "following the loop" : "pick a chord below, or press play")}</span>}
     >
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-stretch gap-3">
-          <Big label="Now playing" value={chord.symbol} accent />
-          <Big label="Next" value={next.symbol} />
-          <Big label="Aim for" value={summary.target.name} hint={`root of ${next.symbol}`} />
+          <Big label={x("Now playing")} value={chord.symbol} accent />
+          <Big label={x("Next")} value={next.symbol} />
+          <Big label={x("Aim for")} value={summary.target.name} hint={x("root of {chord}", { chord: next.symbol })} />
           <div className="min-w-[200px] flex-1 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3">
-            <p className="hud-label">Try these notes</p>
+            <p className="hud-label">{x("Try these notes")}</p>
             <p className="readout mt-1 text-lg">{chord.names.join("  ")}</p>
             <p className="mt-1 text-[11px] text-[var(--color-ink-faint)]">
-              Scale: {key ? `${key.name} (${key.notes.join(" ")})` : "use the chord tones"}
-              {modeName ? ` · ${chord.names[0]} ${modeName} over this chord` : ""}
+              {x("Scale: {scale}", { scale: key ? `${key.name} (${key.notes.join(" ")})` : x("use the chord tones") })}
+              {modeName ? x(" · {note} {mode} over this chord", { note: chord.names[0] ?? "", mode: modeName }) : ""}
             </p>
           </div>
         </div>
 
         {motifs.length > 0 && (
           <div>
-            <p className="hud-label mb-1.5">Triad ideas ({triad!.map((t) => nameMap.get(t.pitchClass)).join(" ")})</p>
+            <p className="hud-label mb-1.5">{x("Triad ideas ({notes})", { notes: triad!.map((t) => nameMap.get(t.pitchClass)).join(" ") })}</p>
             <div className="flex flex-wrap gap-1.5">
               {motifs.map((m) => (
                 <span key={m} className="readout rounded-lg border border-[var(--color-hairline)] bg-[var(--color-void)] px-2.5 py-1 text-sm">
@@ -189,17 +191,22 @@ export function NowPanel({
 
         {summary.commonTones.length > 0 && (
           <p className="text-xs text-[var(--color-ink-dim)]">
-            {summary.commonTones.join(" and ")} {summary.commonTones.length === 1 ? "is" : "are"} in both {chord.symbol} and {next.symbol}: hold {summary.commonTones.length === 1 ? "it" : "one"} across the change for a smooth sound.
+            {x(
+              summary.commonTones.length === 1
+                ? "{notes} is in both {from} and {to}: hold it across the change for a smooth sound."
+                : "{notes} are in both {from} and {to}: hold one across the change for a smooth sound.",
+              { notes: summary.commonTones.join(" + "), from: chord.symbol, to: next.symbol },
+            )}
           </p>
         )}
 
         {bass ? (
           <div>
-            <p className="hud-label mb-2">Bass over {chord.symbol}</p>
+            <p className="hud-label mb-2">{x("Bass over {chord}", { chord: chord.symbol })}</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {bassIdeas.map((b) => (
                 <div key={b.label} className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3">
-                  <p className="text-sm font-medium">{b.label}</p>
+                  <p className="text-sm font-medium">{x(b.label)}</p>
                   <p className="readout text-base text-[var(--color-signal)]">{b.names || "–"}</p>
                   {showTab && <pre className="readout mt-1 overflow-x-auto text-[11px] leading-snug">{b.tab.join("\n")}</pre>}
                 </div>
@@ -207,30 +214,30 @@ export function NowPanel({
             </div>
             <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-[var(--color-ink-dim)]">
               <input type="checkbox" checked={showTab} onChange={(e) => setShowTab(e.target.checked)} className="accent-[var(--color-signal)]" />
-              Show tab
+              {x("Show tab")}
             </label>
           </div>
         ) : (
           fill && (
             <div className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3">
-              <p className="hud-label">Fill into {next.symbol}</p>
-              <p className="readout mt-1 text-xl text-[var(--color-signal)]">{fill.what}</p>
+              <p className="hud-label">{x("Fill into {chord}", { chord: next.symbol })}</p>
+              <p className="readout mt-1 text-xl text-[var(--color-signal)]">{x(fill.what)}</p>
               <p className="mt-1 text-sm text-[var(--color-ink-dim)]">
-                <span className="font-medium text-[var(--color-ink)]">Why? </span>
-                {fill.why}
+                <span className="font-medium text-[var(--color-ink)]">{x("Why? ")}</span>
+                {x(fill.why)}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="primary" onClick={playFill}>
-                  ▶ Play
+                  {x("▶ Play")}
                 </Button>
                 <Button size="sm" onClick={() => setLayer("fill")}>
-                  Show fretboard
+                  {x("Show fretboard")}
                 </Button>
                 <Button size="sm" onClick={() => setShowTab((v) => !v)}>
-                  {showTab ? "Hide tab" : "Show tab"}
+                  {x(showTab ? "Hide tab" : "Show tab")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={stopCompanion}>
-                  ■ Stop
+                  {x("■ Stop")}
                 </Button>
               </div>
               {showTab && <pre className="readout mt-2 overflow-x-auto text-xs leading-relaxed">{ideaTab(board, fill).join("\n")}</pre>}
@@ -242,27 +249,27 @@ export function NowPanel({
           <SegmentedControl
             size="sm"
             options={[
-              { value: "triad", label: "Triad" },
-              { value: "tones", label: "Chord tones" },
-              { value: "target", label: "Target" },
-              { value: "cowboy", label: "Cowboy shape" },
-              ...(fill ? [{ value: "fill", label: "Fill" }] : []),
+              { value: "triad", label: x("Triad") },
+              { value: "tones", label: x("Chord tones") },
+              { value: "target", label: x("Target") },
+              { value: "cowboy", label: x("Cowboy shape") },
+              ...(fill ? [{ value: "fill", label: x("Fill") }] : []),
             ]}
             value={layer}
             onChange={(v) => setLayer(v as Layer)}
           />
           {layer === "cowboy" && !cowboy && (
             <p className="text-xs text-[var(--color-ink-dim)]">
-              {supportsCowboyChords(board) ? `No open cowboy shape for ${chord.symbol}. Try the triad.` : "Cowboy shapes are for six-string guitar in standard tuning."}
+              {supportsCowboyChords(board) ? x("No open cowboy shape for {chord}. Try the triad.", { chord: chord.symbol }) : x("Cowboy shapes are for six-string guitar in standard tuning.")}
             </p>
           )}
           <Fretboard board={board} markers={markers} lowStringOnTop={lowStringOnTop} {...(layer === "cowboy" && cowboy ? { toFret: 5 } : {})} />
           <p className="text-[11px] text-[var(--color-ink-faint)]">
-            {layer === "triad" && "Pink = root, cyan = 3rd, purple = 5th."}
-            {layer === "tones" && "Pink = root, cyan = other chord tones."}
-            {layer === "target" && `Bright cyan = ${summary.target.name}, the note to land on in ${next.symbol}. Cyan = other ${next.symbol} tones. Faint = ${chord.symbol} tones.`}
-            {layer === "cowboy" && "The open shape. Pink = root, cyan = 3rd, purple = 5th."}
-            {layer === "fill" && "Numbers show the order to play; the last note is the target."}
+            {layer === "triad" && x("Pink = root, cyan = 3rd, purple = 5th.")}
+            {layer === "tones" && x("Pink = root, cyan = other chord tones.")}
+            {layer === "target" && x("Bright cyan = {target}, the note to land on in {next}. Cyan = other {next} tones. Faint = {chord} tones.", { target: summary.target.name, next: next.symbol, chord: chord.symbol })}
+            {layer === "cowboy" && x("The open shape. Pink = root, cyan = 3rd, purple = 5th.")}
+            {layer === "fill" && x("Numbers show the order to play; the last note is the target.")}
           </p>
         </div>
       </div>

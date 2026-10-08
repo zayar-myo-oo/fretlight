@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { ProgressionLoop } from "@/lib/audio/progression-loop";
 import { pitchClassMarkers } from "@/lib/companion/markers";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 import { useSession } from "@/store/session";
 
@@ -35,6 +36,7 @@ export function PracticePanel({
   instrument: "guitar" | "bass";
 }) {
   const loop = useRef<ProgressionLoop | null>(null);
+  const x = useTx();
   const [playing, setPlaying] = useState(false);
   // Starts at the app-wide tempo, so a progression sent from the Analyzer plays at its own speed.
   const sessionBpm = useSession((s) => s.bpm);
@@ -103,22 +105,21 @@ export function PracticePanel({
   const fill = fills.find((f) => f.fromChord === chord.index);
 
   return (
-    <Panel title="Practice progression" meta={<span className="text-[11px] text-[var(--color-ink-faint)]">Loops until you stop it</span>}>
+    <Panel title={x("Practice progression")} meta={<span className="text-[11px] text-[var(--color-ink-faint)]">{x("Loops until you stop it")}</span>}>
       <div className="flex flex-col gap-4">
         <p className="text-sm text-[var(--color-ink-dim)]">
-          The progression loops. Improvise over it, aiming for the triad notes of whichever chord is playing, then reach
-          for the target note as the next chord arrives.
+          {x("The progression loops. Improvise over it, aiming for the triad notes of whichever chord is playing, then reach for the target note as the next chord arrives.")}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           {playing ? (
-            <Button onClick={stop}>■ Stop</Button>
+            <Button onClick={stop}>{x("■ Stop")}</Button>
           ) : (
             <Button variant="primary" onClick={() => void start(bpm, layers)} disabled={progression.chords.length === 0}>
-              ▶ Play progression
+              {x("▶ Play progression")}
             </Button>
           )}
           <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-            Tempo
+            {x("Tempo")}
             <input
               type="range"
               min={50}
@@ -138,39 +139,39 @@ export function PracticePanel({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <LayerButton on={layers.has("triad")} onClick={() => toggle("triad")}>
-            Show triad
+            {x("Show triad")}
           </LayerButton>
           <LayerButton on={layers.has("scale")} onClick={() => toggle("scale")}>
-            Show scale
+            {x("Show scale")}
           </LayerButton>
           <LayerButton on={layers.has("tones")} onClick={() => toggle("tones")}>
-            Show chord tones
+            {x("Show chord tones")}
           </LayerButton>
           <LayerButton on={layers.has("fill")} onClick={() => toggle("fill")}>
-            {instrument === "bass" ? "Play bass fill" : "Play fill"}
+            {x(instrument === "bass" ? "Play bass fill" : "Play fill")}
           </LayerButton>
         </div>
 
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <div>
-            <p className="hud-label">Now</p>
+            <p className="hud-label">{x("Now")}</p>
             <p className="readout text-4xl font-semibold text-[var(--color-signal)]">{chord.symbol}</p>
           </div>
           <div>
-            <p className="hud-label">Next</p>
+            <p className="hud-label">{x("Next")}</p>
             <p className="readout text-2xl text-[var(--color-ink-dim)]">{next?.symbol}</p>
           </div>
           {layers.has("fill") && fill && (
             <div>
-              <p className="hud-label">Fill</p>
-              <p className="readout text-sm text-[var(--color-ink-dim)]">{fill.what}</p>
+              <p className="hud-label">{x("Fill")}</p>
+              <p className="readout text-sm text-[var(--color-ink-dim)]">{x(fill.what)}</p>
             </div>
           )}
         </div>
 
         <Fretboard board={board} markers={markers} lowStringOnTop={lowStringOnTop} />
         <p className="text-[11px] text-[var(--color-ink-faint)]">
-          Pink = root · cyan = 3rd · purple = 5th. Faint dots are the rest of the key.
+          {x("Pink = root · cyan = 3rd · purple = 5th. Faint dots are the rest of the key.")}
         </p>
       </div>
     </Panel>

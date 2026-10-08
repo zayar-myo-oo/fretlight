@@ -18,6 +18,7 @@ import { buildIdeaEvents, playEvents, stopCompanion } from "@/lib/audio/companio
 import { ROLE_LABEL, ROLE_TONE, ideaMarkers } from "@/lib/companion/markers";
 import { type SavedIdea, saveIdea } from "@/lib/companion/saved-ideas";
 import { downloadAnalysisPng } from "@/lib/ui/export-analysis";
+import { useTx } from "@/lib/i18n/locale";
 import { cn } from "@/lib/ui/cn";
 
 const TONE_DOT: Record<string, string> = {
@@ -58,6 +59,7 @@ export function IdeaView({
   onSaved: (list: SavedIdea[]) => void;
 }) {
   const [index, setIndex] = useState(0);
+  const x = useTx();
   const [showTab, setShowTab] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -77,9 +79,9 @@ export function IdeaView({
 
   if (!idea) {
     return (
-      <Panel title="Suggestion">
+      <Panel title={x("Suggestion")}>
         <p className="text-sm text-[var(--color-ink-dim)]">
-          No playable idea for this progression on this instrument. Try another style, difficulty or progression.
+          {x("No playable idea for this progression on this instrument. Try another style, difficulty or progression.")}
         </p>
       </Panel>
     );
@@ -117,8 +119,8 @@ export function IdeaView({
     const list = saveIdea(entry);
     if (list) {
       onSaved(list);
-      setMessage("Saved on this device.");
-    } else setMessage("Couldn't save: browser storage is unavailable.");
+      setMessage(x("Saved on this device."));
+    } else setMessage(x("Couldn't save: browser storage is unavailable."));
   };
 
   const saveImage = async () => {
@@ -142,20 +144,20 @@ export function IdeaView({
 
   return (
     <Panel
-      title={`3 · ${CATEGORY_LABELS[idea.category]}`}
+      title={`3 · ${x(CATEGORY_LABELS[idea.category])}`}
       meta={
         idea.category === "fills" ? (
           <label className="flex items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-            Length
+            {x("Length")}
             <select
               value={fillBeats}
               onChange={(e) => onFillBeats(Number(e.target.value))}
               className="h-8 rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2 text-xs"
             >
-              <option value={1}>1 beat</option>
-              <option value={2}>2 beats</option>
-              <option value={4}>1 bar</option>
-              <option value={8}>2 bars</option>
+              <option value={1}>{x("1 beat")}</option>
+              <option value={2}>{x("2 beats")}</option>
+              <option value={4}>{x("1 bar")}</option>
+              <option value={8}>{x("2 bars")}</option>
             </select>
           </label>
         ) : undefined
@@ -173,48 +175,48 @@ export function IdeaView({
                   i === index ? "border-[var(--color-signal)] bg-[rgba(34,224,214,0.1)]" : "border-[var(--color-hairline)] bg-[var(--color-void)] hover:border-[var(--color-hairline-bright)]",
                 )}
               >
-                <span className="block text-sm font-medium">{item.title}</span>
-                <span className="readout text-[11px] text-[var(--color-ink-faint)]">{item.what.length > 34 ? `${item.what.slice(0, 34)}…` : item.what}</span>
+                <span className="block text-sm font-medium">{x(item.title)}</span>
+                <span className="readout text-[11px] text-[var(--color-ink-faint)]">{(() => { const w = x(item.what); return w.length > 34 ? `${w.slice(0, 34)}…` : w; })()}</span>
               </button>
             ))}
           </div>
         )}
 
         <div>
-          <h3 className="text-lg font-semibold">{idea.title}</h3>
-          <p className="readout mt-1 text-xl text-[var(--color-signal)]">{idea.what}</p>
+          <h3 className="text-lg font-semibold">{x(idea.title)}</h3>
+          <p className="readout mt-1 text-xl text-[var(--color-signal)]">{x(idea.what)}</p>
         </div>
 
         <dl className="grid gap-3 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-5">
-          <Row label="What">{isRhythm ? idea.what : `Play ${noteList}.`}</Row>
-          <Row label="Why">{idea.why}</Row>
-          <Row label="Where">{idea.where}</Row>
-          {idea.target && isMelodic && <Row label="Target">{idea.target.name}</Row>}
-          {idea.tip && <Row label="Tip">{idea.tip}</Row>}
+          <Row label={x("What")}>{isRhythm ? x(idea.what) : x("Play {notes}.", { notes: noteList })}</Row>
+          <Row label={x("Why")}>{x(idea.why)}</Row>
+          <Row label={x("Where")}>{x(idea.where)}</Row>
+          {idea.target && isMelodic && <Row label={x("Target")}>{idea.target.name}</Row>}
+          {idea.tip && <Row label={x("Tip")}>{x(idea.tip)}</Row>}
         </dl>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" onClick={() => void play(false)}>
-            ▶ Play
+            {x("▶ Play")}
           </Button>
-          <Button onClick={() => void play(true)}>▶ Play with progression</Button>
+          <Button onClick={() => void play(true)}>{x("▶ Play with progression")}</Button>
           {playing && (
             <Button variant="ghost" onClick={stop}>
-              ■ Stop
+              {x("■ Stop")}
             </Button>
           )}
           <Button variant="ghost" onClick={onAnother}>
-            ⟳ Another version
+            {x("⟳ Another version")}
           </Button>
           <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-[var(--color-ink-dim)]">
             <input type="checkbox" checked={showTab} onChange={(e) => setShowTab(e.target.checked)} className="accent-[var(--color-signal)]" />
-            Show tab
+            {x("Show tab")}
           </label>
         </div>
 
         {isRhythm && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-dim)]">
-            Show shape for
+            {x("Show shape for")}
             {progression.chords.map((c) => (
               <button
                 key={c.index}
@@ -236,29 +238,29 @@ export function IdeaView({
             return (
               <span key={tone} className="flex items-center gap-1.5">
                 <span className={cn("h-2.5 w-2.5 rounded-full", TONE_DOT[tone])} />
-                {ROLE_LABEL[role]}
+                {x(ROLE_LABEL[role])}
               </span>
             );
           })}
-          {isMelodic && <span>Numbers show the order to play.</span>}
+          {isMelodic && <span>{x("Numbers show the order to play.")}</span>}
         </div>
 
         {showTab && (
           <div>
-            <p className="hud-label mb-1.5">Tab</p>
+            <p className="hud-label mb-1.5">{x("Tab")}</p>
             <pre className="readout overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-xs leading-relaxed">{tab.join("\n")}</pre>
             {idea.pattern && (
-              <pre className="readout mt-2 overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-xs leading-relaxed">{idea.pattern.join("\n")}</pre>
+              <pre className="readout mt-2 overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-void)] p-3 text-xs leading-relaxed">{idea.pattern.map((line) => x(line)).join("\n")}</pre>
             )}
           </div>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={saveCurrent}>
-            Save idea
+            {x("Save idea")}
           </Button>
           <Button size="sm" onClick={() => void saveImage()}>
-            Save image
+            {x("Save image")}
           </Button>
           {message && <span className="text-xs text-[var(--color-ink-dim)]">{message}</span>}
         </div>
