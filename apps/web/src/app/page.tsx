@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { INSTRUMENTS, getInstrument, tuningsFor } from "@fretlight/core";
+import { AppIntro } from "@/components/intro/AppIntro";
 import { Badge } from "@/components/ui/Badge";
 import { Panel } from "@/components/ui/Panel";
 import { Stat } from "@/components/ui/Stat";
@@ -27,17 +28,18 @@ export default function HomePage() {
     <div className="flex flex-col gap-6">
       <section className="animate-rise">
         <Badge tone="signal" className="mb-4">
-          Phase 1 · local engine online
+          Guitar & bass practice companion
         </Badge>
         <h1 className="text-gradient max-w-3xl text-4xl leading-[1.08] font-semibold tracking-tight md:text-6xl">
           Play. It listens, understands and shows you where you are.
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--color-ink-dim)] md:text-base">
-          Pitch detection, music theory, fretboard geometry and timing all run on this
-          device. No round trip, no model call, no network — the practice loop stays
-          under your fingers.
+          Tune up, learn scales and chords, and practise with live feedback. Everything runs
+          on this device: no account, and your audio never leaves it.
         </p>
       </section>
+
+      <AppIntro />
 
       <Panel title="Choose your instrument">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
