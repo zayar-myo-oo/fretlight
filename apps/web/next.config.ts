@@ -23,6 +23,10 @@ const config: NextConfig = {
   // with "can't infer type of chunk from URL app-pages-internals" and renders a
   // blank page. Worth retrying on a later Next.
   transpilePackages: ["@fretlight/core"],
+  // Music Theory became the Analyze mode of the Fretboard tab.
+  async redirects() {
+    return [{ source: "/music-theory", destination: "/fretboard?mode=analyze", permanent: false }];
+  },
   typescript: {
     ignoreBuildErrors: false,
   },

@@ -31,15 +31,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     href: "/fretboard",
     label: "Fretboard",
-    hint: "Scales, chords, note finder",
+    hint: "Explore scales and chords, find a key, listen to your playing",
     icon: "M3 6h18M3 12h18M3 18h18M8 4v16M14 4v16",
     mobilePrimary: true,
-  },
-  {
-    href: "/music-theory",
-    label: "Music Theory",
-    hint: "Find the key, scale and chords from notes",
-    icon: "M12 3v12m0 0a3 3 0 1 1-3-3h3Zm0-12 6 3M5 20h14",
   },
   {
     href: "/metronome",

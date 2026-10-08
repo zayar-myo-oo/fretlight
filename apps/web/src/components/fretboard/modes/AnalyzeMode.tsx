@@ -14,7 +14,6 @@ import {
 } from "@fretlight/core";
 import { useMemo, useRef, useState } from "react";
 import { Fretboard, type FretMarker } from "@/components/fretboard/Fretboard";
-import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { NotePicker } from "@/components/ui/NotePicker";
@@ -35,7 +34,7 @@ interface ChordSel {
 
 const posKey = (string: number, fret: number) => `${string}:${fret}`;
 
-export default function MusicTheoryPage() {
+export function AnalyzeMode() {
   const { board } = useFretboardContext();
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -193,35 +192,23 @@ export default function MusicTheoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Music Theory</h1>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">
-            Tap notes on the neck to see which key they point to, then explore that key&apos;s
-            scale and chords.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={clear} disabled={!selected.size && !chosenKey}>
-            Clear
-          </Button>
-          <Button size="sm" variant="primary" onClick={() => void save()} disabled={saving || !markers.length}>
-            {saving ? "Saving…" : "Save Image"}
-          </Button>
-        </div>
-      </header>
-
       <Panel
-        title="Pick notes on the neck"
+        title="1 · Tap notes on the neck"
         meta={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {activeKey && !chord && (
               <Button size="sm" variant="ghost" onClick={() => setShowKey((v) => !v)}>
                 {showKey ? "Hide key notes" : "Show key notes"}
               </Button>
             )}
             <Button size="sm" variant="ghost" onClick={() => stopTheory()}>
-              ■ Stop
+              ■ Stop sound
+            </Button>
+            <Button size="sm" onClick={clear} disabled={!selected.size && !chosenKey}>
+              Clear
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => void save()} disabled={saving || !markers.length}>
+              {saving ? "Saving…" : "Save image"}
             </Button>
           </div>
         }
@@ -352,7 +339,6 @@ export default function MusicTheoryPage() {
             />
           </Panel>
 
-          <LiveChordPanel activeKey={activeKey} />
         </div>
 
         <div className="flex flex-col gap-6">
