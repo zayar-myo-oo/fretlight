@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace @fretlight/web",
     "build": "npm run build --workspace @fretlight/core && npm run build --workspace @fretlight/web",
-    "test": "npm run test --workspace @fretlight/core",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspace @fretlight/web"
   },

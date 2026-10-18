@@ -113,7 +113,8 @@ export async function playEvents(events: readonly PlayEvent[], seconds: number, 
       }),
     ),
   );
-  doneTimer = setTimeout(() => onDone?.(), seconds * 1000);
+  if (id !== playId) return;
+  doneTimer = setTimeout(() => onDone?.(), Math.max(0, start + seconds - fretSynth.currentTime()) * 1000);
 }
 
 /** A strummed chord on its own. */

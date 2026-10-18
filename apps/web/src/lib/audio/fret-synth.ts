@@ -8,7 +8,8 @@ import { useSession } from "@/store/session";
  * Notes are modelled plucked strings (Karplus-Strong, see `renderPluck`), shaped
  * by a small per-sound filter chain: body resonance for an acoustic, a pickup
  * bump for an electric, a drive stage for overdrive. Each rendered note is cached
- * as an AudioBuffer, so a repeat costs nothing, and no sample files are loaded.
+ * as an AudioBuffer. Recorded samples load in the background; the model keeps
+ * working when the network is slow or unavailable.
  *
  * Not `ReferenceToneEngine`: that holds one sustained tone and stops it when
  * another starts. Here every pluck gets its own source, so earlier notes keep
@@ -131,6 +132,13 @@ export interface PluckOptions {
   readonly mute?: boolean;
 }
 
+export type SampleStatus = "idle" | "loading" | "ready" | "fallback";
+
+interface SamplerEntry {
+  player: Soundfont;
+  status: SampleStatus;
+}
+
 export class FretSynth {
   private active = new Set<AudioBufferSourceNode>();
   private context: AudioContext | null = null;
@@ -140,8 +148,13 @@ export class FretSynth {
   private chosen: string | null = null;
   private volume = 0.7;
   private loaded = false;
-  private samplers = new Map<string, { player: Soundfont; ready: boolean }>();
+  private samplers = new Map<string, SamplerEntry>();
   private stops = new Set<(time?: number) => void>();
+  private generation = 0;
+
+  getSampleStatus(): SampleStatus {
+    return this.samplers.get(this.getPreset().id)?.status ?? "idle";
+  }
 
   /** Subscribe to preset / volume changes (for useSyncExternalStore). */
   subscribe = (listener: () => void): (() => void) => {
@@ -211,6 +224,8 @@ export class FretSynth {
 
   /** Silence everything that is sounding or scheduled. */
   stopAll(): void {
+    // Also cancel plucks still awaiting AudioContext.resume().
+    this.generation++;
     for (const source of this.active) {
       try {
         source.stop();
@@ -224,11 +239,13 @@ export class FretSynth {
   }
 
   dispose(): void {
+    this.stopAll();
     void this.context?.close();
     this.context = null;
     this.master = null;
     this.buffers.clear();
     this.samplers.clear();
+    this.emit();
   }
 
   /**
@@ -237,12 +254,14 @@ export class FretSynth {
    * `mute` chokes it after a moment, like a palm-muted or scratched string.
    */
   async pluck(midi: number, preset: SoundPreset = this.getPreset(), options: PluckOptions = {}): Promise<void> {
+    const generation = this.generation;
     const context = await this.ensureContext();
-    const now = options.at ?? context.currentTime + (options.when ?? 0);
+    if (generation !== this.generation || context !== this.context) return;
+    const now = Math.max(context.currentTime, options.at ?? context.currentTime + (options.when ?? 0));
 
     // Recorded guitar/bass samples once they have downloaded; the modelled string until then (or offline).
     const sampler = this.samplerFor(context, preset);
-    if (sampler.ready) {
+    if (sampler.status === "ready") {
       const velocity = Math.round(Math.max(1, Math.min(127, 96 * (options.gain ?? 1))));
       const stop = sampler.player.start({ note: midi, time: now, velocity, ...(options.mute ? { duration: 0.12 } : {}) });
       this.stops.add(stop);
@@ -298,22 +317,26 @@ export class FretSynth {
   }
 
   /** One sample player per sound, created on first use and loaded in the background. */
-  private samplerFor(context: AudioContext, preset: SoundPreset): { player: Soundfont; ready: boolean } {
+  private samplerFor(context: AudioContext, preset: SoundPreset): SamplerEntry {
     let entry = this.samplers.get(preset.id);
     if (!entry) {
-      const created: { player: Soundfont; ready: boolean } = {
+      const created: SamplerEntry = {
         player: new Soundfont(context, { kit: "MusyngKite", instrument: preset.sample, destination: this.master! }),
-        ready: false,
+        status: "loading",
       };
       created.player.load.then(
         () => {
-          created.ready = true;
+          created.status = "ready";
+          if (this.samplers.get(preset.id) === created) this.emit();
         },
         () => {
           // No network: keep using the modelled string for this sound.
+          created.status = "fallback";
+          if (this.samplers.get(preset.id) === created) this.emit();
         },
       );
       this.samplers.set(preset.id, created);
+      this.emit();
       entry = created;
     }
     return entry;
@@ -326,9 +349,18 @@ export class FretSynth {
   async preload(preset: SoundPreset = this.getPreset(), timeoutMs = 4000): Promise<boolean> {
     const context = await this.ensureContext();
     const entry = this.samplerFor(context, preset);
-    if (entry.ready) return true;
-    await Promise.race([entry.player.load.catch(() => null), new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
-    return entry.ready;
+    if (entry.status === "ready") return true;
+    if (entry.status === "fallback") return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        entry.player.load.catch(() => null),
+        new Promise((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    return this.samplers.get(preset.id) === entry && this.samplers.get(preset.id)?.status === "ready";
   }
 
   private bufferFor(context: AudioContext, preset: SoundPreset, midi: number): AudioBuffer {
@@ -357,12 +389,15 @@ export class FretSynth {
    * whole phrase can then be scheduled against one start time with no drift.
    */
   async warm(items: readonly { midi: number; preset?: SoundPreset }[]): Promise<number> {
+    const generation = this.generation;
     const context = await this.ensureContext();
+    if (generation !== this.generation || context !== this.context) return context.currentTime;
     const presets = new Set(items.map((item) => item.preset ?? this.getPreset()));
-    for (const preset of presets) await this.preload(preset, 2500);
+    await Promise.all([...presets].map((preset) => this.preload(preset, 2500)));
+    if (generation !== this.generation || context !== this.context) return context.currentTime;
     for (const item of items) {
       const preset = item.preset ?? this.getPreset();
-      if (!this.samplers.get(preset.id)?.ready) this.bufferFor(context, preset, item.midi);
+      if (this.samplers.get(preset.id)?.status !== "ready") this.bufferFor(context, preset, item.midi);
     }
     return context.currentTime;
   }
@@ -379,8 +414,9 @@ export class FretSynth {
       this.master.gain.value = this.volume;
       this.master.connect(compressor).connect(this.context.destination);
     }
-    if (this.context.state === "suspended") await this.context.resume();
-    return this.context;
+    const context = this.context;
+    if (context.state === "suspended" || (context.state as string) === "interrupted") await context.resume();
+    return context;
   }
 }
 

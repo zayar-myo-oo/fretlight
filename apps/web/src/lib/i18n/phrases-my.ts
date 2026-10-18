@@ -25,6 +25,12 @@ const deg = (word: string) => DEGREE[word] ?? word;
 const and = (list: string) => list.replace(/ and /g, " နဲ့ ");
 
 export const PHRASES_MY: Record<string, string> = {
+  "Loading instrument samples. Synth sound is available.": "တူရိယာအသံများကို ရယူနေသည်။ Synth အသံဖြင့် တီးနိုင်ပါသည်။",
+  "Instrument samples ready.": "တူရိယာအသံများ အဆင်သင့်ဖြစ်ပါပြီ။",
+  "Samples unavailable. Using synth sound.": "တူရိယာအသံများ မရနိုင်သေးပါ။ Synth အသံကို သုံးနေသည်။",
+  "Samples load when you play. Synth sound works offline.": "တီးသည့်အခါ တူရိယာအသံများကို ရယူပါမည်။ Synth အသံကို အင်တာနက်မရှိဘဲ သုံးနိုင်သည်။",
+  "Audio could not start. Tap Test sound to retry.": "အသံ ဖွင့်မရသေးပါ။ ထပ်စမ်းရန် အသံစမ်းရန်ကို နှိပ်ပါ။",
+  "■ Stop test": "■ အသံစမ်းခြင်း ရပ်ရန်",
   // ---------------------------------------------------------------- quick ideas
   "No progression yet.": "ကော့ဒ်အစဉ် မရှိသေးပါ။",
   "Enter chords like C G Am F to get playable ideas.": "တီးလို့ရတဲ့ အိုင်ဒီယာတွေ ရဖို့ C G Am F လို ကော့ဒ်တွေ ရိုက်ထည့်ပါ။",
