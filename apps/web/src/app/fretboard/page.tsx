@@ -9,6 +9,8 @@ import { ListenMode } from "@/components/fretboard/modes/ListenMode";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { useFretboardContext } from "@/hooks/useFretboard";
 import { detectionHub } from "@/lib/audio/detection-hub";
+import { CompactMetronome } from "@/components/fretboard/CompactMetronome";
+import { useTx } from "@/lib/i18n/locale";
 import { useSession } from "@/store/session";
 
 type Mode = "explore" | "analyze" | "listen";
@@ -16,19 +18,19 @@ type Mode = "explore" | "analyze" | "listen";
 const MODES: readonly { value: Mode; label: string; hint: string; blurb: string }[] = [
   {
     value: "explore",
-    label: "Explore",
+    label: "Notes & chords",
     hint: "Pick a scale or chord and see it on the neck",
     blurb: "Pick a scale or chord and see it on the neck.",
   },
   {
     value: "analyze",
-    label: "Analyze",
+    label: "Relationships",
     hint: "Tap notes to find the key, scale and chords",
     blurb: "Tap notes on the neck to find the key, then explore its scale and chords.",
   },
   {
     value: "listen",
-    label: "Listen",
+    label: "Play & listen",
     hint: "Play your instrument and see what it hears",
     blurb: "Plug in or use a mic and see which chord or note you're playing.",
   },
@@ -48,6 +50,7 @@ export default function FretboardPage() {
 }
 
 function FretboardShell() {
+  const x = useTx();
   const params = useSearchParams();
   const [mode, setMode] = useState<Mode>(() => parseMode(params.get("mode")));
   const { board, instrumentName } = useFretboardContext();
@@ -74,20 +77,22 @@ function FretboardShell() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Fretboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">{current.blurb}</p>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--color-ink-dim)]">{x(current.blurb)}</p>
           <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
             {instrumentName} · {board.tuning.name}{" "}
-            <Link href="/" className="underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink-dim)]">
-              change
+            <Link href="/settings" className="underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink-dim)]">
+              {x("change")}
             </Link>
           </p>
         </div>
         <SegmentedControl
-          options={MODES.map(({ value, label, hint }) => ({ value, label, hint }))}
+          options={MODES.map(({ value, label, hint }) => ({ value, label: x(label), hint: x(hint) }))}
           value={mode}
           onChange={change}
         />
       </header>
+
+      <CompactMetronome />
 
       {mode === "explore" && <ExploreMode />}
       {mode === "analyze" && <AnalyzeMode />}

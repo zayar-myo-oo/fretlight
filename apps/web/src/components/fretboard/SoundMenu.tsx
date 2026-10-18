@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { SOUND_PRESETS, fretSynth } from "@/lib/audio/fret-synth";
 import { useTx } from "@/lib/i18n/locale";
 import { useSession } from "@/store/session";
-import { playEvents, stopCompanion } from "@/lib/audio/companion-player";
+import { playEvents, stopPlayback } from "@/lib/audio/event-player";
 
 /** Pick what the app sounds like when you tap a fret or press Play, plus volume. */
 export function SoundMenu() {
@@ -18,12 +18,12 @@ export function SoundMenu() {
 
   useEffect(() => () => {
     preview.current++;
-    if (activePreview.current) stopCompanion();
+    if (activePreview.current) stopPlayback();
   }, []);
 
   const stopPreview = () => {
     preview.current++;
-    if (activePreview.current) stopCompanion();
+    if (activePreview.current) stopPlayback();
     activePreview.current = false;
     setTesting(false);
   };

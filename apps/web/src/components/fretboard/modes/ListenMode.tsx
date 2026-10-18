@@ -10,13 +10,10 @@ import { PositionReadout } from "@/components/fretboard/PositionReadout";
 import { NotePicker } from "@/components/ui/NotePicker";
 import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { CameraStage } from "@/components/vision/CameraStage";
 import { useDetection } from "@/hooks/useDetection";
 import { useFretboardContext } from "@/hooks/useFretboard";
 import { useHandPosition } from "@/hooks/useHandPosition";
 import { detectionHub } from "@/lib/audio/detection-hub";
-import { defaultCalibration } from "@/lib/vision/calibration";
-import { openCamera } from "@/lib/vision/camera";
 import { useSession } from "@/store/session";
 
 type Target = "chords" | "notes";
@@ -53,7 +50,7 @@ export function ListenMode() {
         <p className="text-sm text-[var(--color-ink-dim)]">
           {target === "chords"
             ? "Strum a chord on your guitar or bass and see its name, notes and place in a key."
-            : "Play one note at a time and see exactly where on the neck it was played."}
+            : "Play one note at a time and see its likely position on the neck."}
         </p>
       </Panel>
 
@@ -98,49 +95,11 @@ function ChordListening() {
 }
 
 function NoteListening() {
-  const { board, scale } = useFretboardContext();
+  const { board } = useFretboardContext();
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
   const { position, noteEventId } = useDetection();
   const handFret = useHandPosition();
-  const [cameraOn, setCameraOn] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-
-  // Camera lifecycle, kept separate from the microphone: turning one off must
-  // never affect the other. Audio says *what* was played; the camera only helps
-  // with *where*.
-  useEffect(() => {
-    let cancelled = false;
-    if (!cameraOn) {
-      setStream((previous) => {
-        for (const track of previous?.getTracks() ?? []) track.stop();
-        return null;
-      });
-      return;
-    }
-    void openCamera({ facingMode: "environment" })
-      .then((next) => {
-        if (cancelled) {
-          for (const track of next.getTracks()) track.stop();
-          return;
-        }
-        setStream(next);
-      })
-      .catch(() => setCameraOn(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [cameraOn]);
-
-  // A capture indicator that stays lit after you leave the screen is alarming.
-  useEffect(
-    () => () => {
-      setStream((previous) => {
-        for (const track of previous?.getTracks() ?? []) track.stop();
-        return null;
-      });
-    },
-    [],
-  );
+  useEffect(() => () => { void detectionHub.disable(); }, []);
 
   const markers = useMemo<FretMarker[]>(
     () =>
@@ -152,27 +111,7 @@ function NoteListening() {
 
   return (
     <div className="flex flex-col gap-6">
-      <InputBar cameraOn={cameraOn} onCameraChange={setCameraOn} />
-
-      {cameraOn && (
-        <Panel title="Camera" tight>
-          <CameraStage
-            stream={stream}
-            board={board}
-            scale={scale}
-            activeMidi={null}
-            playedPosition={position ? { string: position.string, fret: position.fret } : null}
-            calibration={defaultCalibration()}
-            calibrating={false}
-            mode="auto"
-            onCalibrationChange={() => {}}
-            showScaleOverlay={false}
-          />
-          <p className="mt-2 px-1 text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
-            The camera helps decide <em>where</em> a note was played. What pitch it was is always decided by audio.
-          </p>
-        </Panel>
-      )}
+      <InputBar />
 
       <Panel title="What you played">
         <PositionReadout board={board} />

@@ -15,7 +15,6 @@ import {
   intervalName,
   mod,
 } from "@fretlight/core";
-import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { DisplayMenu } from "@/components/fretboard/DisplayMenu";
 import { SoundMenu } from "@/components/fretboard/SoundMenu";
@@ -37,20 +36,6 @@ import { useSession } from "@/store/session";
 
 type Kind = "scale" | "chord";
 
-// Three.js (~140 kB) is only loaded once the 3D view is asked for, and never on
-// the server, since it needs a real WebGL canvas.
-const Fretboard3D = dynamic(
-  () => import("@/components/fretboard/Fretboard3D").then((m) => m.Fretboard3D),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-[var(--color-hairline)] bg-black/40 text-xs text-[var(--color-ink-faint)]">
-        Loading 3D view…
-      </div>
-    ),
-  },
-);
-
 /** Pick a scale or chord, see it on the neck. */
 export function ExploreMode() {
   const mounted = useMounted();
@@ -66,7 +51,6 @@ export function ExploreMode() {
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
 
   const [kind, setKind] = useState<Kind>("scale");
-  const [view, setView] = useState<"2d" | "3d">("2d");
   const [shapeIndex, setShapeIndex] = useState<number | "all">("all");
   const { position, noteEventId } = useDetection();
 
@@ -167,7 +151,7 @@ export function ExploreMode() {
       <Panel title="2 · See it on the neck" meta={
           <div className="flex flex-wrap items-start justify-end gap-2">
             <SoundMenu />
-            <DisplayMenu view={view} onViewChange={setView} />
+            <DisplayMenu />
           </div>
         }>
         <div className="mb-4">
@@ -194,15 +178,6 @@ export function ExploreMode() {
           </div>
         )}
 
-        {view === "3d" ? (
-          <Fretboard3D
-            board={board}
-            markers={mounted ? withLive : markers}
-            lowStringOnTop={lowStringOnTop}
-            className="h-[420px] w-full overflow-hidden rounded-2xl border border-[var(--color-hairline)] bg-black/40"
-            onSelect={onSelect}
-          />
-        ) : (
           <Fretboard
             board={board}
             markers={mounted ? withLive : markers}
@@ -212,7 +187,7 @@ export function ExploreMode() {
             lowStringOnTop={lowStringOnTop}
             onSelect={onSelect}
           />
-        )}
+
 
         <div className="mt-4 flex flex-wrap items-center gap-4 text-[11px] text-[var(--color-ink-faint)]">
           <Legend tone="root" label="Root" />

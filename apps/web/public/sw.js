@@ -20,7 +20,7 @@
  * DSP/theory engine. It is not an offline-first cache of the whole app.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE_NAME = `fretlight-${VERSION}`;
 
 const PRECACHE = [

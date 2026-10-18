@@ -1,8 +1,8 @@
 {
-  "name": "Fretlight — Guitar & Bass Practice",
+  "name": "Fretlight — Learn the Fretboard",
   "short_name": "Fretlight",
-  "description": "An intelligent practice companion for guitar and bass: real-time pitch detection, interactive fretboard, scales, chords and rhythm — all computed locally.",
-  "start_url": "/",
+  "description": "Hear notes, understand chords and explore your guitar or bass fretboard.",
+  "start_url": "/fretboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

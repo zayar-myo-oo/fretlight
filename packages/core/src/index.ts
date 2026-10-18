@@ -19,9 +19,6 @@ export * from "./theory/chords";
 export * from "./theory/arpeggio";
 export * from "./theory/harmonic-function";
 export * from "./theory/key-detection";
-export * from "./song-analysis";
-export * from "./companion";
-export * from "./looper/loop-math";
 
 // Instrument
 export * from "./instrument/tunings";
@@ -50,27 +47,8 @@ export * from "./audio/pluck";
 export * from "./timing/metronome";
 export * from "./timing/rhythm";
 
-// Practice
-export * from "./practice/sequence";
-export * from "./practice/practice-engine";
-export * from "./practice/scoring";
-export * from "./practice/drills";
-export * from "./practice/bassline";
-export * from "./practice/insights";
-export * from "./practice/ear-training";
 
-// Song / backing-track architecture
-export * from "./song/types";
-export * from "./song/phrase";
-export * from "./song/library";
 
-// Vision
-export * from "./vision/homography";
-export * from "./vision/edges";
-export * from "./vision/hough";
-export * from "./vision/neck-detector";
-export * from "./vision/tracking";
-export * from "./vision/motion";
 
 // Events
 export * from "./events/types";

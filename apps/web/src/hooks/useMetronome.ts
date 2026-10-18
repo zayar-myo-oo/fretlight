@@ -38,10 +38,6 @@ export function useMetronome(): MetronomeController {
 
   const settings: MetronomeSettings = { bpm, timeSignature, subdivision, accentFirstBeat };
 
-  if (engineRef.current === null && typeof window !== "undefined") {
-    engineRef.current = new MetronomeEngine(settings);
-  }
-
   useEffect(() => {
     engineRef.current?.update(settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,19 +48,18 @@ export function useMetronome(): MetronomeController {
   }, [volume]);
 
   useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
+    const engine = new MetronomeEngine(settings);
+    engine.setVolume(volume);
+    engineRef.current = engine;
     const unsubscribe = engine.onBeat(setBeat);
     return () => {
       unsubscribe();
+      engine.dispose();
+      if (engineRef.current === engine) engineRef.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      engineRef.current?.dispose();
-      engineRef.current = null;
-    };
+    // Setup must recreate the engine after Strict Mode's cleanup/replay.
+    // Settings and volume changes are applied by the effects above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const start = useCallback(async () => {

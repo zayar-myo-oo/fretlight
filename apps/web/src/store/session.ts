@@ -46,7 +46,6 @@ export interface SessionState {
    * who prefers the view they get looking down at their own instrument.
    */
   lowStringOnTop: boolean;
-  showOutOfScale: boolean;
   /** Play a short chime when the tuner reading lands in tune. */
   tunerChimeEnabled: boolean;
 
@@ -64,9 +63,6 @@ export interface SessionState {
   subdivision: Subdivision;
   accentFirstBeat: boolean;
   metronomeVolume: number;
-
-  // --- Practice ---
-  matchOctave: boolean;
 
   /**
    * Which fret the fretting hand is around, or null for "work it out".
@@ -114,7 +110,6 @@ export const useSession = create<SessionState>()(
 
       labelMode: "note",
       lowStringOnTop: false,
-      showOutOfScale: false,
       tunerChimeEnabled: true,
 
       inputGain: 1,
@@ -127,7 +122,6 @@ export const useSession = create<SessionState>()(
       accentFirstBeat: true,
       metronomeVolume: 0.6,
 
-      matchOctave: false,
       handFret: null,
 
       setInstrument: (instrumentId) =>

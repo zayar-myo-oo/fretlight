@@ -14,28 +14,7 @@ import {
 import { useSession } from "@/store/session";
 import { cn } from "@/lib/ui/cn";
 
-/**
- * The input controls, as one compact row above the fretboard.
- *
- * Microphone and camera are independently switchable, and independently
- * meaningful: audio answers *what pitch* was played, the camera answers *where*
- * it was played. Either is useful without the other, so neither may disable the
- * other.
- *
- * "Off" means off. Turning the microphone off releases the MediaStream and tears
- * down the worklet and worker rather than merely ignoring the result — a page
- * that keeps a recording indicator lit after you switched it off has broken
- * faith with the user, whatever it does with the samples.
- */
-export function InputBar({
-  cameraOn,
-  onCameraChange,
-  className,
-}: {
-  readonly cameraOn: boolean;
-  readonly onCameraChange: (on: boolean) => void;
-  readonly className?: string;
-}) {
+export function InputBar({ className }: { readonly className?: string }) {
   const instrumentId = useSession((s) => s.instrumentId);
   const audio = useAudioState();
   const signal = useSignalState();
@@ -129,12 +108,6 @@ export function InputBar({
           ))}
         </select>
       </label>
-
-      {/* --- Camera, entirely separate --- */}
-      <div className="flex items-center gap-2.5">
-        <span className="hud-label">Camera</span>
-        <Toggle on={cameraOn} onChange={onCameraChange} />
-      </div>
 
       <span
         className={cn(

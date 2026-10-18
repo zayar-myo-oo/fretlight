@@ -11,12 +11,8 @@ import { useSession } from "@/store/session";
  */
 export function DisplayMenu({
   showLabels = true,
-  view,
-  onViewChange,
 }: {
   readonly showLabels?: boolean;
-  readonly view?: "2d" | "3d";
-  readonly onViewChange?: (view: "2d" | "3d") => void;
 }) {
   const [open, setOpen] = useState(false);
   const labelMode = useSession((s) => s.labelMode);
@@ -56,19 +52,7 @@ export function DisplayMenu({
               onChange={(value) => patch({ lowStringOnTop: value === "player" })}
             />
           </Group>
-          {view && onViewChange && (
-            <Group label="View">
-              <SegmentedControl
-                size="sm"
-                options={[
-                  { value: "2d", label: "2D" },
-                  { value: "3d", label: "3D" },
-                ]}
-                value={view}
-                onChange={(value) => onViewChange(value as "2d" | "3d")}
-              />
-            </Group>
-          )}
+
         </div>
       )}
     </div>

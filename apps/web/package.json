@@ -12,12 +12,10 @@
   },
   "dependencies": {
     "@fretlight/core": "*",
-    "@mediapipe/tasks-vision": "^1.0.1",
     "next": "^15.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "smplr": "^0.16.4",
-    "three": "^0.186.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -25,7 +23,6 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "@types/three": "^0.186.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vitest": "^4.1.11"

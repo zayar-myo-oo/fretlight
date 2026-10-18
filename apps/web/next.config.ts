@@ -25,7 +25,12 @@ const config: NextConfig = {
   transpilePackages: ["@fretlight/core"],
   // Music Theory became the Analyze mode of the Fretboard tab.
   async redirects() {
-    return [{ source: "/music-theory", destination: "/fretboard?mode=analyze", permanent: false }];
+    return [
+      { source: "/music-theory", destination: "/fretboard?mode=analyze", permanent: false },
+      ...["song", "live", "companion", "bassline", "practice", "ear", "analyzer", "metronome", "progress"].map(route => ({
+        source: "/" + route, destination: "/fretboard", permanent: false,
+      })),
+    ];
   },
   typescript: {
     ignoreBuildErrors: false,

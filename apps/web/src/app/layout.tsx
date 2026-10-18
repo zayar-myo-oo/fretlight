@@ -17,9 +17,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fretlight — Guitar & Bass Practice",
+  title: "Fretlight — Learn the Fretboard",
   description:
-    "An intelligent practice companion for guitar and bass: real-time pitch detection, interactive fretboard, scales, chords and rhythm — all computed locally.",
+    "Hear notes, understand intervals and chords, and see what you play on an interactive guitar and bass fretboard.",
   applicationName: "Fretlight",
   manifest: "/manifest.webmanifest",
   icons: {
