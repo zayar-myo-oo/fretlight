@@ -114,8 +114,14 @@ export function ExploreMode() {
 
   return (
     <div className="flex flex-col gap-6">
+      <details className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-panel)]">
+        <summary className="cursor-pointer px-4 py-3 text-sm text-[var(--color-ink-dim)]">
+          <span className="font-semibold text-[var(--color-ink)]">{title}</span>
+          <span className="ml-3 text-xs">Change notes, scale or chord</span>
+        </summary>
+        <div className="px-3 pb-3">
       <Panel
-        title="1 · Choose what to see"
+        title="Choose what to see"
         meta={
           <SegmentedControl
             size="sm"
@@ -147,8 +153,10 @@ export function ExploreMode() {
           </div>
         </div>
       </Panel>
+        </div>
+      </details>
 
-      <Panel title="2 · See it on the neck" meta={
+      <Panel title="Fretboard" meta={
           <div className="flex flex-wrap items-start justify-end gap-2">
             <SoundMenu />
             <DisplayMenu />
