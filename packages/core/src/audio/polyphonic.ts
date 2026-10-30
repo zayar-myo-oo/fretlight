@@ -15,10 +15,15 @@ export interface PolyphonicFrame {
   chord: ChordMatch | null;
 }
 
+/** Consecutive no-match frames (~50 ms each) tolerated while the input is still active. */
+const MAX_MISSES = 2;
+
 /** Independent FFT/chroma path: never derives chords from a sequence of YIN notes. */
 export class PolyphonicDetector {
   private spectrum: SpectrumAnalyzer;
   private stable = new ChordStabilizer(3, 0.78);
+  private misses = 0;
+  private last: ChordMatch | null = null;
   constructor(readonly sampleRate: number, readonly size = 8192, private gate = 0.0035) {
     this.spectrum = new SpectrumAnalyzer(size);
   }
@@ -39,9 +44,16 @@ export class PolyphonicDetector {
       const tied = matches[1] && raw.confidence - matches[1].confidence < 0.025;
       if (!complete || notes.length < 2 || tied || raw.confidence < 0.78) raw = null;
     }
-    // Clear immediately on silence/no evidence instead of holding a confident stale chord.
-    if (!active || !raw) this.stable = new ChordStabilizer(3, 0.78);
+    // Silence clears immediately. A ringing chord whose chroma briefly loses a
+    // tone (common as a DI chord decays) gets a short grace instead of a reset,
+    // which was making the name flicker off and on.
+    if (!active) { this.misses = 0; this.stable = new ChordStabilizer(3, 0.78); this.last = null; }
+    else if (!raw) {
+      if (++this.misses > MAX_MISSES) { this.stable = new ChordStabilizer(3, 0.78); this.last = null; }
+      return { level, peak, active, chroma, notes, raw, chord: this.misses > MAX_MISSES ? null : this.last };
+    } else this.misses = 0;
     const chord = this.stable.push(raw);
+    this.last = chord;
     return { level, peak, active, chroma, notes, raw, chord };
   }
 }

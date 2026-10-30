@@ -8,7 +8,8 @@ export type DetectionValue =
 export type DetectionEvent = DetectionValue & { at: number };
 const subscribers = new Set<(time: number, value: DetectionValue) => void>();
 export const captureEvents = {
-  push(time: number, value: DetectionValue) { for (const fn of subscribers) fn(time, value); },
+  // A failing subscriber must never break the detector, nor one detector the recorder.
+  push(time: number, value: DetectionValue) { for (const fn of subscribers) { try { fn(time, value); } catch { /* isolated */ } } },
   subscribe(fn: (time: number, value: DetectionValue) => void) { subscribers.add(fn); return () => { subscribers.delete(fn); }; },
 };
 export interface RecordedSession {
@@ -22,8 +23,12 @@ export interface RecordedSession {
   board: Fretboard;
   events: DetectionEvent[];
   audio: Blob;
-  /** Events represent detection decision times, not inferred acoustic onsets. */
+  /** Events represent detection decision times, shifted back by `latency` to approximate acoustic onset. */
   timing: "audio-context-decision-time";
+  /** Seconds subtracted from decision times: analysis window per kind (estimated, not measured). */
+  latency?: { note: number; chord: number };
+  /** Requested take length, seconds. */
+  limit?: number;
   stopReason: string;
 }
 export interface RecorderState { recording: boolean; saving: boolean; error: string | null; latest: RecordedSession | null }
@@ -53,13 +58,16 @@ export class SessionRecorder {
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
   private patch(value: Partial<RecorderState>) { this.state = { ...this.state, ...value }; for (const fn of this.listeners) fn(); }
 
-  start(board: Fretboard): void {
+  start(board: Fretboard, limitSeconds = 30): void {
     if (this.recorder || this.state.saving) throw new Error("A recording is already being saved.");
     const input = sharedInput.current;
     if (!input || input.context.state !== "running") throw new Error("Connect or resume an input before recording.");
     const mimeType = recordingMimeType();
     const recorder = new MediaRecorder(input.stream, mimeType ? { mimeType } : undefined);
-    const origin = input.context.currentTime;
+    // Re-anchored in onstart: MediaRecorder takes a moment to begin capturing.
+    let origin = input.context.currentTime;
+    // The YIN frame and the chord FFT window each lag the sound they describe.
+    const latency = { note: 0.05, chord: Math.round((input.context.sampleRate > 48000 ? 16384 : 8192) / input.context.sampleRate / 2 * 1000) / 1000 };
     const events: DetectionEvent[] = [];
     const chunks: Blob[] = [];
     let bytes = 0, duration = 0, failure: string | null = null;
@@ -68,22 +76,24 @@ export class SessionRecorder {
     this.endTime = null;
     this.recorder = recorder;
     const track = input.stream.getAudioTracks()[0];
-    const metadata = { version: 1 as const, id: crypto.randomUUID(), createdAt: new Date().toISOString(), sampleRate: input.context.sampleRate, deviceLabel: track?.label || "Audio input", trackSettings: track?.getSettings() ?? {}, board: structuredClone(board), timing: "audio-context-decision-time" as const };
-    let lastKey = "";
+    const metadata = { version: 1 as const, id: crypto.randomUUID(), createdAt: new Date().toISOString(), sampleRate: input.context.sampleRate, deviceLabel: track?.label || "Audio input", trackSettings: track?.getSettings() ?? {}, board: structuredClone(board), timing: "audio-context-decision-time" as const, latency, limit: limitSeconds };
+    // Per kind: notes and chords interleave, and a shared key would log every flip.
+    const lastKey = { note: "", chord: "" };
     const unEvents = captureEvents.subscribe((time, value) => {
-      const at = time - origin;
-      if (at < 0 || recorder.state !== "recording") return;
-      const key = value.kind === "note" ? `n:${value.midi}` : `c:${value.chord?.symbol ?? ""}:${value.notes.join(",")}`;
-      if (key === lastKey) return;
-      lastKey = key;
-      events.push({ ...value, at: Math.max(events.at(-1)?.at ?? 0, at) });
+      const at = time - origin - latency[value.kind];
+      if (recorder.state !== "recording") return;
+      // Spectral note sets wobble frame to frame; only the chord name defines an event.
+      const key = value.kind === "note" ? `${value.midi}` : `${value.chord?.symbol ?? ""}`;
+      if (key === lastKey[value.kind]) return;
+      lastKey[value.kind] = key;
+      events.push({ ...value, at: Math.max(0, events.at(-1)?.at ?? 0, at) });
     });
     const unInput = sharedInput.subscribe(() => {
       if (sharedInput.current !== input || input.context.state !== "running") {
         void this.stop("Input changed, disconnected or interrupted").catch(() => {});
       }
     });
-    const limit = setTimeout(() => { void this.stop("Five-minute recording limit reached").catch(() => {}); }, 5 * 60_000);
+    const limit = setTimeout(() => { void this.stop(`${limitSeconds}-second take complete`).catch(() => {}); }, limitSeconds * 1000 + 150);
     this.completion = new Promise<RecordedSession>((resolve, reject) => {
       const cleanup = () => { clearTimeout(limit); unEvents(); unInput(); this.recorder = null; this.input = null; };
       recorder.ondataavailable = ({ data }) => {
@@ -106,6 +116,7 @@ export class SessionRecorder {
           resolve(session);
         });
       };
+      recorder.onstart = () => { origin = input.context.currentTime; };
       try { recorder.start(250); } catch (error) { cleanup(); this.patch({ recording: false, saving: false, error: String(error) }); reject(error); }
 
     });

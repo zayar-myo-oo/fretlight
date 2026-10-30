@@ -141,10 +141,19 @@ export class MicrophonePitchSource implements PitchSource {
 
       let inFlight = false;
       let submittedAt = 0;
-      worker.onerror = () => { if (this.running) this.options.onDeviceLost?.(); };
+      // A single analysis exception must not tear down the input (and with it any
+      // recording). Skip the frame; only a worker that keeps failing is fatal.
+      let workerErrors = 0;
+      worker.onerror = (event) => {
+        event.preventDefault();
+        inFlight = false;
+        if (++workerErrors > 10 && this.running) this.options.onDeviceLost?.();
+      };
       node.onprocessorerror = () => { if (this.running) this.options.onDeviceLost?.(); };
       node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; time: number }>) => {
         this.diagnostics.workletFrames++;
+        // A frame the worker never answered must not stall detection forever.
+        if (inFlight && performance.now() - submittedAt > 500) inFlight = false;
         if (inFlight || !this.running || context.state !== "running") return;
         inFlight = true;
         submittedAt = performance.now();
@@ -158,6 +167,7 @@ export class MicrophonePitchSource implements PitchSource {
         if (event.data.type === "ready") this.diagnostics.workerReady = true;
         if (event.data.type !== "estimate" || !event.data.estimate) return;
         this.diagnostics.workerFrames++;
+        workerErrors = 0;
         this.diagnostics.processingMs = performance.now() - submittedAt;
         inFlight = false;
         if (!this.running || context.state !== "running") return;
