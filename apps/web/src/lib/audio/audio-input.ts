@@ -104,5 +104,5 @@ export function watchDevices(onChange: (devices: AudioInputDevice[]) => void): (
  * A room microphone at the same threshold would analyse the fridge.
  */
 export function noiseFloorFor(type: InputType): number {
-  return type === "audio_interface" ? 0.0035 : 0.009;
+  return type === "audio_interface" ? 0.0035 : 0.005;
 }

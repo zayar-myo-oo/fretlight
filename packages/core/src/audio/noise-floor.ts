@@ -33,17 +33,18 @@ export class NoiseFloorTracker {
   constructor(options: NoiseFloorOptions = {}) {
     this.absoluteFloor = options.absoluteFloor ?? 0.0015;
     this.margin = options.margin ?? 2.2;
-    this.maxFloor = options.maxFloor ?? 0.02;
+    // 0.02 sat inside the normal level of a quiet guitar on an interface, so a
+    // risen floor could mute real playing.
+    this.maxFloor = options.maxFloor ?? 0.008;
     this.leak = options.leak ?? 0.0008;
   }
 
   /** Feed every frame's RMS, whether or not a note was found. */
   observe(rms: number): void {
     if (!Number.isFinite(rms) || rms <= 0) return;
-    if (this.ambient === null) {
-      this.ambient = rms;
-      return;
-    }
+    // Start from the absolute floor, never from the first frame: opening the
+    // input mid-strum used to adopt the guitar itself as "the room".
+    if (this.ambient === null) this.ambient = this.absoluteFloor;
 
     // Track the *minimum*, with a slow upward leak.
     //
@@ -53,7 +54,12 @@ export class NoiseFloorTracker {
     // was following. Taking the minimum cannot do that — a note is always
     // louder than the silence around it — while the leak lets the estimate
     // recover if the room genuinely gets noisier.
-    this.ambient = Math.min(rms, this.ambient * (1 + this.leak));
+    //
+    // While a frame clearly clears the gate it is playing, not room: leak at a
+    // tenth of the rate, so a minute of continuous playing cannot walk the
+    // floor up past the guitar and mute it.
+    const playing = rms > this.threshold;
+    this.ambient = Math.min(rms, this.ambient * (1 + (playing ? this.leak / 10 : this.leak)));
   }
 
   /** The level a frame must exceed to be worth analysing. */
