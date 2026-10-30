@@ -12,7 +12,7 @@ export function chromaFromSpectrum(
   decibels: Float32Array,
   sampleRate: number,
   fftSize: number,
-  options: { minHz?: number; maxHz?: number; floorDb?: number } = {},
+  options: { minHz?: number; maxHz?: number; floorDb?: number; suppressHarmonics?: boolean } = {},
 ): number[] {
   const { minHz = 70, maxHz = 2000, floorDb = -90 } = options;
   const binHz = sampleRate / fftSize;
@@ -20,13 +20,13 @@ export function chromaFromSpectrum(
   const to = Math.min(decibels.length - 2, Math.floor(maxHz / binHz));
   const chroma = new Array<number>(12).fill(0);
 
-  const peaks: { pc: number; magnitude: number }[] = [];
+  const peaks: { pc: number; magnitude: number; frequency: number }[] = [];
   let loudest = 0;
   for (let k = from; k <= to; k++) {
     const a = decibels[k - 1]!;
     const b = decibels[k]!;
     const c = decibels[k + 1]!;
-    if (b < floorDb || b < a || b <= c) continue;
+    if (!Number.isFinite(a + b + c) || b < floorDb || b < a || b <= c) continue;
 
     // Parabolic interpolation: a bin is wider than a semitone at guitar's low end.
     const denominator = a - 2 * b + c;
@@ -38,7 +38,24 @@ export function chromaFromSpectrum(
 
     const magnitude = 10 ** (b / 20);
     loudest = Math.max(loudest, magnitude);
-    peaks.push({ pc: mod(nearest, 12), magnitude });
+    peaks.push({ pc: mod(nearest, 12), magnitude, frequency });
+  }
+
+  if (options.suppressHarmonics) {
+    // Work from low to high. Subtract a conservative harmonic envelope rather
+    // than counting a string's third/fifth partial as another played note.
+    for (let i = 0; i < peaks.length; i++) {
+      const fundamental = peaks[i]!;
+      if (fundamental.magnitude < loudest * 0.08) continue;
+      for (let j = i + 1; j < peaks.length; j++) {
+        const partial = peaks[j]!;
+        const ratio = partial.frequency / fundamental.frequency;
+        const harmonic = Math.round(ratio);
+        if (harmonic >= 2 && harmonic <= 8 && Math.abs(ratio - harmonic) / harmonic < 0.015) {
+          partial.magnitude = Math.max(0, partial.magnitude - fundamental.magnitude * 1.2 / harmonic);
+        }
+      }
+    }
   }
 
   // Ignore peaks far below the loudest one: they are noise, not notes.

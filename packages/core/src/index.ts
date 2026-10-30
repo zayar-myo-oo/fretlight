@@ -53,3 +53,5 @@ export * from "./timing/rhythm";
 // Events
 export * from "./events/types";
 export * from "./events/bus";
+
+export * from "./audio/polyphonic";

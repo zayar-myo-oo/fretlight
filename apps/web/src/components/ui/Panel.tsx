@@ -13,7 +13,7 @@ export interface PanelProps {
 /** The standard container. Titles use the hardware-silkscreen label style. */
 export function Panel({ children, title, meta, className, bodyClassName, tight }: PanelProps) {
   return (
-    <section className={cn("surface stack", className)}>
+    <section className={cn("surface stack min-w-0", className)}>
       {(title || meta) && (
         <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--color-hairline)] px-5 py-3.5">
           {title && <h2 className="hud-label whitespace-nowrap">{title}</h2>}

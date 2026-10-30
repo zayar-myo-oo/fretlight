@@ -112,7 +112,9 @@ export class PitchPipeline {
 
   /** Frame length, in original-rate samples, needed to resolve minFrequency. */
   get requiredFrameSize(): number {
-    return this.detector.requiredFrameSize * this.decimator.factor;
+    // Four periods give the independent window filters time to settle before
+    // YIN compares the low-E waveform; two periods were phase-sensitive live.
+    return this.detector.requiredFrameSize * this.decimator.factor * 2;
   }
 
   process(frame: Float32Array): PitchEstimate {
@@ -131,6 +133,12 @@ export class PitchPipeline {
 
     if (this.scratch.length !== frame.length) this.scratch = new Float32Array(frame.length);
     this.scratch.set(frame);
+    // Worklet frames overlap: carrying IIR state from the previous window's
+    // END into this window's earlier START creates a discontinuity every hop.
+    // Each complete window is conditioned independently; temporal gate/onset
+    // state remains continuous below.
+    this.conditioner.reset();
+    this.decimator.reset();
     this.conditioner.processInPlace(this.scratch);
 
     const decimated = this.decimator.process(this.scratch);

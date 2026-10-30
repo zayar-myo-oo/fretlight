@@ -11,3 +11,6 @@ coverage
 .idea
 .vercel
 .claude/scheduled_tasks.lock
+
+test-results/
+playwright-report/

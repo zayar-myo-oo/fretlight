@@ -1,6 +1,7 @@
 "use client";
 
 import { PitchPipeline, type PitchEstimate } from "@fretlight/core";
+import { sharedInput, type InputSession } from "./shared-input";
 import { type InputType, noiseFloorFor } from "./audio-input";
 import type { PitchFrame, PitchSource } from "./pitch-source";
 
@@ -59,7 +60,11 @@ export class MicrophonePitchSource implements PitchSource {
   private node: AudioWorkletNode | null = null;
   private worker: Worker | null = null;
   private listeners = new Set<(frame: PitchFrame) => void>();
+  readonly diagnostics = { workletFrames: 0, workerFrames: 0, workerReady: false, processingMs: 0 };
   private running = false;
+  private generation = 0;
+  private input: InputSession | null = null;
+  private unsubscribeInput: (() => void) | null = null;
 
   constructor(private options: MicrophoneOptions) {}
 
@@ -88,91 +93,117 @@ export class MicrophonePitchSource implements PitchSource {
       );
     }
 
-    const stream = await this.requestStream();
-    this.stream = stream;
+    const ticket = ++this.generation;
+    try {
+      const input = await sharedInput.open(this.options.deviceId, this.options.gain);
+      if (ticket !== this.generation) { await input.close(); return; }
+      this.input = input;
+      const { stream, context } = input;
+      this.stream = stream;
+      this.context = context;
 
-    const context = new AudioContext({ latencyHint: "interactive" });
-    this.context = context;
-    if (context.state === "suspended") await context.resume();
-
-    // Size the frame from what the detector actually needs at this sample rate:
-    // a 30.87 Hz low B needs a much longer window than a guitar's low E, and
-    // padding every instrument to the worst case would add latency for nothing.
-    const probe = new PitchPipeline({
-      sampleRate: context.sampleRate,
-      minFrequency: this.options.minFrequency,
-      maxFrequency: this.options.maxFrequency,
-    });
-    const rmsThreshold = noiseFloorFor(this.options.inputType ?? "microphone");
-    const frameSize = nextPowerOfTwo(probe.requiredFrameSize);
-
-    await context.audioWorklet.addModule("/worklets/frame-collector.js");
-
-    const node = new AudioWorkletNode(context, "frame-collector", {
-      numberOfInputs: 1,
-      numberOfOutputs: 0,
-      processorOptions: { frameSize, hopSize: Math.max(256, frameSize >> 3) },
-    });
-    this.node = node;
-
-    const worker = new Worker(new URL("./pitch.worker.ts", import.meta.url), { type: "module" });
-    this.worker = worker;
-    worker.postMessage({
-      type: "configure",
-      options: {
+      // Size the frame from what the detector actually needs at this sample rate:
+      // a 30.87 Hz low B needs a much longer window than a guitar's low E, and
+      // padding every instrument to the worst case would add latency for nothing.
+      const probe = new PitchPipeline({
         sampleRate: context.sampleRate,
         minFrequency: this.options.minFrequency,
         maxFrequency: this.options.maxFrequency,
-        rmsThreshold,
-        // Spectral flatness, harmonic ratio and onset detection — what the
-        // instrument gate needs to tell a plucked string from a conversation.
-        analyzeQuality: true,
-      },
-    });
-
-    node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; time: number }>) => {
-      const { samples, time } = event.data;
-      worker.postMessage({ type: "frame", samples, time }, [samples.buffer]);
-    };
-
-    worker.onmessage = (
-      event: MessageEvent<{ type: string; estimate?: PitchEstimate; time?: number }>,
-    ) => {
-      if (event.data.type !== "estimate" || !event.data.estimate) return;
-      const frame: PitchFrame = {
-        estimate: event.data.estimate,
-        time: event.data.time ?? context.currentTime,
-      };
-      for (const listener of this.listeners) listener(frame);
-    };
-
-    // A software gain stage ahead of analysis. getUserMedia's own AGC is
-    // disabled (it pumps a decaying note), so this is the only volume control
-    // there is — set once at unity by default, adjustable live via `setGain`
-    // without touching the stream or restarting anything downstream.
-    const gainNode = context.createGain();
-    gainNode.gain.value = this.options.gain ?? 1;
-    this.gainNode = gainNode;
-
-    context.createMediaStreamSource(stream).connect(gainNode).connect(node);
-
-    const track = stream.getAudioTracks()[0];
-    if (track) {
-      this.label = track.label || (this.options.inputType === "audio_interface" ? "Audio interface" : "Microphone");
-      // An interface being unplugged ends the track rather than raising an
-      // error. Without this the app would sit there looking live and deaf.
-      track.addEventListener("ended", () => {
-        if (!this.running) return;
-        this.running = false;
-        this.options.onDeviceLost?.();
       });
-    }
+      const rmsThreshold = noiseFloorFor(this.options.inputType ?? "microphone");
+      const frameSize = nextPowerOfTwo(probe.requiredFrameSize);
 
-    this.running = true;
+      await context.audioWorklet.addModule("/worklets/frame-collector.js");
+      if (ticket !== this.generation) return;
+
+      const node = new AudioWorkletNode(context, "frame-collector", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        processorOptions: { frameSize, hopSize: Math.max(256, frameSize >> 3) },
+      });
+      this.node = node;
+
+      const worker = new Worker(new URL("./pitch.worker.ts", import.meta.url), { type: "module" });
+      this.worker = worker;
+      worker.postMessage({
+        type: "configure",
+        options: {
+          sampleRate: context.sampleRate,
+          minFrequency: this.options.minFrequency,
+          maxFrequency: this.options.maxFrequency,
+          rmsThreshold,
+          // Spectral flatness, harmonic ratio and onset detection — what the
+          // instrument gate needs to tell a plucked string from a conversation.
+          analyzeQuality: true,
+        },
+      });
+
+      let inFlight = false;
+      let submittedAt = 0;
+      worker.onerror = () => { if (this.running) this.options.onDeviceLost?.(); };
+      node.onprocessorerror = () => { if (this.running) this.options.onDeviceLost?.(); };
+      node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; time: number }>) => {
+        this.diagnostics.workletFrames++;
+        if (inFlight || !this.running || context.state !== "running") return;
+        inFlight = true;
+        submittedAt = performance.now();
+        const { samples, time } = event.data;
+        worker.postMessage({ type: "frame", samples, time }, [samples.buffer]);
+      };
+
+      worker.onmessage = (
+        event: MessageEvent<{ type: string; estimate?: PitchEstimate; time?: number }>,
+      ) => {
+        if (event.data.type === "ready") this.diagnostics.workerReady = true;
+        if (event.data.type !== "estimate" || !event.data.estimate) return;
+        this.diagnostics.workerFrames++;
+        this.diagnostics.processingMs = performance.now() - submittedAt;
+        inFlight = false;
+        if (!this.running || context.state !== "running") return;
+        const frame: PitchFrame = {
+          estimate: event.data.estimate,
+          time: event.data.time ?? context.currentTime,
+        };
+        for (const listener of this.listeners) listener(frame);
+      };
+
+      // A software gain stage ahead of analysis. getUserMedia's own AGC is
+      // disabled (it pumps a decaying note), so this is the only volume control
+      // there is — set once at unity by default, adjustable live via `setGain`
+      // without touching the stream or restarting anything downstream.
+      this.gainNode = input.gain;
+      input.gain.connect(node);
+      // Worklet outputs zeros; a destination connection keeps Safari pulling frames.
+      node.connect(context.destination);
+      this.unsubscribeInput = sharedInput.subscribe(() => {
+        if (sharedInput.current !== input && this.running) {
+          this.running = false;
+          this.options.onDeviceLost?.();
+        }
+      });
+
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        this.label = track.label || (this.options.inputType === "audio_interface" ? "Audio interface" : "Microphone");
+        // An interface being unplugged ends the track rather than raising an
+        // error. Without this the app would sit there looking live and deaf.
+        track.addEventListener("ended", () => {
+          if (!this.running) return;
+          this.running = false;
+          this.options.onDeviceLost?.();
+        });
+      }
+
+      this.running = true;
+    } catch (error) { if (ticket === this.generation) await this.stop(); throw error; }
   }
 
   async stop(): Promise<void> {
     this.running = false;
+    ++this.generation;
+    this.unsubscribeInput?.();
+    this.unsubscribeInput = null;
 
     this.node?.port.postMessage("stop");
     this.node?.disconnect();
@@ -183,16 +214,16 @@ export class MicrophonePitchSource implements PitchSource {
     this.worker?.terminate();
     this.worker = null;
 
-    for (const track of this.stream?.getTracks() ?? []) track.stop();
     this.stream = null;
-
-    await this.context?.close();
+    const input = this.input;
+    this.input = null;
+    await input?.close();
     this.context = null;
   }
 
   /** Re-tune the detector's search range after an instrument change. */
   async reconfigure(options: MicrophoneOptions): Promise<void> {
-    this.options = options;
+    this.options = { ...this.options, ...options };
     if (!this.running) return;
     await this.stop();
     await this.start();
@@ -212,38 +243,7 @@ export class MicrophonePitchSource implements PitchSource {
     return base + output;
   }
 
-  private async requestStream(): Promise<MediaStream> {
-    // Every one of these processors is tuned for speech and actively harmful
-    // here: AGC pumps a decaying note, noise suppression treats a sustained
-    // low bass fundamental as background hum and removes it, and echo
-    // cancellation introduces comb filtering that wrecks periodicity.
-    const audio: MediaTrackConstraints = {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false,
-      channelCount: 1,
-    };
-    if (this.options.deviceId) audio.deviceId = { exact: this.options.deviceId };
 
-    try {
-      return await navigator.mediaDevices.getUserMedia({ audio, video: false });
-    } catch (error) {
-      const name = (error as DOMException)?.name;
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        throw new MicrophonePermissionError(
-          "Microphone access was blocked. Allow it in your browser's site settings and try again.",
-          "denied",
-        );
-      }
-      if (name === "NotFoundError" || name === "OverconstrainedError") {
-        throw new MicrophonePermissionError(
-          "No usable microphone or audio interface was found.",
-          "unavailable",
-        );
-      }
-      throw error;
-    }
-  }
 }
 
 /** Input devices, once permission has been granted at least once. */

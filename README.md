@@ -30,6 +30,7 @@ npm run dev
 npm test
 npm run typecheck
 npm run build
+npm run test:e2e --workspace @fretlight/web # installed Chrome required
 ~~~
 
 Core theory, DSP and timing live in packages/core. The Next.js browser app lives
@@ -44,6 +45,10 @@ project is required.
 
 ## Privacy
 
-Microphone input is analysed locally, without recording or uploading it.
+Microphone input is analysed locally. Record take explicitly saves captured audio and
+timestamped detection events to this browser (IndexedDB); nothing is uploaded.
+Export audio and timeline JSON to keep a portable copy, or delete individual takes.
 Preferences stay in this browser. Stored data from retired features is left
 untouched and is no longer read by the app.
+
+Audio repair details, validation results and hardware limitations are in [docs/AUDIO-REPAIR.md](docs/AUDIO-REPAIR.md).

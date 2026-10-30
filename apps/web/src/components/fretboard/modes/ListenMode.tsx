@@ -2,6 +2,8 @@
 
 import { type MusicKey, getKey, type KeyMode } from "@fretlight/core";
 import { useEffect, useMemo, useState } from "react";
+import { RecordingPanel } from "@/components/audio/RecordingPanel";
+import { detectionMarkers } from "@/lib/audio/detection-markers";
 import { InputBar } from "@/components/audio/InputBar";
 import { LiveChordPanel } from "@/components/audio/LiveChordPanel";
 import { DisplayMenu } from "@/components/fretboard/DisplayMenu";
@@ -55,6 +57,7 @@ export function ListenMode() {
       </Panel>
 
       {target === "chords" ? <ChordListening /> : <NoteListening />}
+      <RecordingPanel />
     </div>
   );
 }
@@ -65,7 +68,7 @@ function ChordListening() {
   const activeKey: MusicKey | null = useMemo(() => (root === null ? null : getKey(root, mode)), [root, mode]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
       <LiveChordPanel activeKey={activeKey} />
       <Panel
         title="Key context (optional)"
@@ -97,17 +100,11 @@ function ChordListening() {
 function NoteListening() {
   const { board } = useFretboardContext();
   const lowStringOnTop = useSession((s) => s.lowStringOnTop);
-  const { position, noteEventId } = useDetection();
+  const { reading, activeMidi, instrumentConfidence, uiState, noteEventId } = useDetection();
   const handFret = useHandPosition();
   useEffect(() => () => { void detectionHub.disable(); }, []);
 
-  const markers = useMemo<FretMarker[]>(
-    () =>
-      position
-        ? [{ string: position.string, fret: position.fret, label: position.name, tone: "live", emphasis: true }]
-        : [],
-    [position],
-  );
+  const markers = useMemo<FretMarker[]>(() => detectionMarkers(board, { kind: "note", midi: uiState === "stable" ? activeMidi : null, frequency: reading?.frequency ?? null, confidence: instrumentConfidence }), [board, activeMidi, reading, instrumentConfidence, uiState]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -115,11 +112,14 @@ function NoteListening() {
 
       <Panel title="What you played">
         <PositionReadout board={board} />
+        <p className="readout mt-3 text-sm">{uiState === "stable" && reading ? `${reading.note.name}${reading.note.octave} · ${reading.frequency.toFixed(2)} Hz · ${Math.round(instrumentConfidence * 100)}% confidence` : "No confident note detected"}</p>
       </Panel>
 
-      <Panel title="Where on the neck" meta={<DisplayMenu showLabels={false} />}>
+      <Panel title="Possible positions · frets 0–12" meta={<DisplayMenu showLabels={false} />}>
+        <p className="mb-2 text-xs text-[var(--color-ink-faint)]">Audio identifies pitch and octave. These are possible positions, not a measured string or fret.</p>
         <Fretboard
           board={board}
+          toFret={12}
           markers={markers}
           activeEventId={noteEventId}
           {...(handFret !== null ? { handWindow: { from: handFret, to: handFret + 4 } } : {})}

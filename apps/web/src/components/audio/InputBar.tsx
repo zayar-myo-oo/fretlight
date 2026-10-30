@@ -1,8 +1,9 @@
 "use client";
 
 import { getInstrument } from "@fretlight/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useAudioState, useSignalState } from "@/hooks/useDetection";
+import { sharedInput } from "@/lib/audio/shared-input";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import {
   type AudioInputDevice,
@@ -17,6 +18,7 @@ import { cn } from "@/lib/ui/cn";
 export function InputBar({ className }: { readonly className?: string }) {
   const instrumentId = useSession((s) => s.instrumentId);
   const audio = useAudioState();
+  const contextState = useSyncExternalStore(sharedInput.subscribe, () => sharedInput.current?.context.state ?? "off", () => "off");
   const signal = useSignalState();
 
   const [inputType, setInputType] = useState<InputType>("microphone");
@@ -26,18 +28,19 @@ export function InputBar({ className }: { readonly className?: string }) {
 
   const micOn = audio.sourceKind === "microphone" && audio.listening;
 
-  const turnMicOn = useCallback(async () => {
+  const turnMicOn = useCallback(async (selectedId = deviceId, selectedType = inputType) => {
     const instrument = getInstrument(instrumentId);
     if (!instrument) return;
     setBusy(true);
+    try {
     await detectionHub.useMicrophone({
       minFrequency: instrument.minFrequency,
       maxFrequency: instrument.maxFrequency,
-      inputType,
-      ...(deviceId ? { deviceId } : {}),
+      inputType: selectedType,
+      ...(selectedId ? { deviceId: selectedId } : {}),
     });
     setDevices(await listInputs());
-    setBusy(false);
+    } finally { setBusy(false); }
   }, [instrumentId, inputType, deviceId]);
 
   const turnMicOff = useCallback(async () => {
@@ -82,6 +85,7 @@ export function InputBar({ className }: { readonly className?: string }) {
           onChange={(event) => {
             setInputType(event.target.value as InputType);
             setDeviceId("");
+            if (micOn) void turnMicOn("", event.target.value as InputType);
           }}
           className="h-8 rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2 text-xs text-[var(--color-ink-dim)]"
         >
@@ -93,10 +97,11 @@ export function InputBar({ className }: { readonly className?: string }) {
       <label className="flex items-center gap-2">
         <span className="hud-label">Device</span>
         <select
+          disabled={audio.starting}
           value={deviceId}
           onChange={(event) => {
             setDeviceId(event.target.value);
-            if (micOn) void turnMicOn();
+            if (micOn) void turnMicOn(event.target.value);
           }}
           className="h-8 min-w-[150px] max-w-[220px] rounded-lg border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-2 text-xs text-[var(--color-ink-dim)]"
         >
@@ -122,6 +127,9 @@ export function InputBar({ className }: { readonly className?: string }) {
         {micOn ? signal.state.replace(/_/g, " ") : "input off"}
       </span>
 
+      {micOn && <div className="w-full text-xs"><meter aria-label="Input level" min={0} max={1} value={audio.signalStrength} /> {audio.peakLevel >= 0.97 ? "Clipping — lower interface gain" : "Input level"}</div>}
+
+      {contextState !== "off" && contextState !== "running" && <button onClick={() => void sharedInput.resume().catch(() => {})}>Resume audio input</button>}
       {audio.error && (
         <p className="w-full rounded-lg border border-[rgba(255,84,112,0.35)] bg-[rgba(255,84,112,0.08)] px-3 py-2 text-[11px] text-[var(--color-ink-dim)]">
           {audio.error}

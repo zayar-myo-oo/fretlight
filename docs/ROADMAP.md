@@ -8,6 +8,7 @@ The product loop is: see a note → hear it → understand its relationship → 
 - Relationships view for selected notes, keys and chord tones.
 - Microphone/interface listening for single notes or chords.
 - Compact metronome, tuner and instrument settings.
+- Local audio takes with timestamped note/chord transitions, synchronized replay, export and session history.
 
 ## Next
 

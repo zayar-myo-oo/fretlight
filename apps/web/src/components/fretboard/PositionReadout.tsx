@@ -36,7 +36,7 @@ export function PositionReadout({
   // position estimator's own score) are different questions, but a player
   // only needs the answer to "can I trust what's on screen?" — which is only
   // as strong as its weaker half.
-  const overallConfidence = position.string !== null ? Math.min(pitch.confidence, position.confidence) : pitch.confidence;
+  const overallConfidence = pitch.confidence;
 
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-6", className)}>
@@ -63,7 +63,7 @@ export function PositionReadout({
       {/* Where on the neck */}
       <div className="flex items-center gap-6">
         <Field
-          label="String"
+          label="Estimated string"
           value={
             hasNote && stringLabel && position.string !== null
               ? `${position.string + 1} · ${stringLabel}`
@@ -72,7 +72,7 @@ export function PositionReadout({
           dim={!hasNote}
         />
         <Field
-          label="Fret"
+          label="Estimated fret"
           value={hasNote && position.fret !== null ? (position.fret === 0 ? "open" : String(position.fret)) : "—"}
           dim={!hasNote}
         />
@@ -82,7 +82,7 @@ export function PositionReadout({
           dim={!hasNote}
         />
         <Field
-          label="Confidence"
+          label="Pitch confidence"
           value={hasNote ? `${Math.round(overallConfidence * 100)}%` : "—"}
           dim={!hasNote}
         />
@@ -100,8 +100,8 @@ export function PositionReadout({
         {!hasNote
           ? signal.message || "waiting for input"
           : uncertain
-            ? "position uncertain — this pitch exists in more than one place; set “Hand at” or turn the camera on"
-            : "position confirmed"}
+            ? "multiple possible positions — hand position can narrow the estimate"
+            : "position estimated from pitch — audio cannot confirm fingering"}
       </p>
     </div>
   );

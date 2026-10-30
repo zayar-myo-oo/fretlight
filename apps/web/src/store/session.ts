@@ -70,7 +70,7 @@ export interface SessionState {
    * Audio cannot tell an A2 on the low E at fret 5 from the open A string — they
    * are the same waveform. Without this, the app can only assume the easiest
    * position, which is wrong for most real playing: a pentatonic box at the 5th
-   * fret gets drawn down at the nut. Setting it makes the highlight exact.
+   * fret gets drawn down at the nut. Setting it narrows the estimate but cannot prove a fingering.
    */
   handFret: number | null;
 

@@ -33,6 +33,8 @@ import {
   type SignalStateSlice,
   reuseIfEqual,
 } from "./detection-state";
+import { sharedInput } from "./shared-input";
+import { captureEvents } from "./session-recording";
 import type { InputType } from "./audio-input";
 import type { PitchFrame, PitchSource, PitchSourceKind } from "./pitch-source";
 
@@ -142,6 +144,7 @@ class DetectionHub {
   private snapshot: DetectionSnapshot = EMPTY;
   private listeners = new Set<() => void>();
   private noteCounter = 0;
+  private operation = 0;
 
   /** Context the camera and the practice engine can feed the position estimator. */
   private positionContext: PositionContext = {};
@@ -157,6 +160,15 @@ class DetectionHub {
   private pitchStateSlice: PitchStateSlice = EMPTY_PITCH_STATE;
   private positionState: FretPositionStateSlice = EMPTY_POSITION_STATE;
   private signalState: SignalStateSlice = EMPTY_SIGNAL_STATE;
+
+  constructor() {
+    sharedInput.subscribe(() => {
+      if (this.source.kind === "microphone" && sharedInput.current?.context.state !== "running") {
+        this.resetStages();
+        this.patch({ uiState: "no_signal", reading: null, activeMidi: null, held: false, position: null, candidates: [], instrumentConfidence: 0, rms: 0, peak: 0 });
+      }
+    });
+  }
 
   getSnapshot = (): DetectionSnapshot => this.snapshot;
   getAudioState = (): AudioState => this.audioState;
@@ -221,9 +233,13 @@ class DetectionHub {
 
   async start(): Promise<void> {
     if (this.source.isRunning) return;
+    const source = this.source;
+    const ticket = ++this.operation;
     this.resetStages();
-    this.unsubscribeSource = this.source.onFrame(this.handleFrame);
-    await this.source.start();
+    this.unsubscribeSource?.();
+    this.unsubscribeSource = source.onFrame(this.handleFrame);
+    await source.start();
+    if (ticket !== this.operation || source !== this.source) return;
     this.patch({
       listening: true,
       sourceKind: this.source.kind,
@@ -232,11 +248,14 @@ class DetectionHub {
   }
 
   async stop(): Promise<void> {
+    const ticket = ++this.operation;
     this.unsubscribeSource?.();
     this.unsubscribeSource = null;
     await this.source.stop();
+    if (ticket !== this.operation) return;
     this.resetStages();
     this.snapshot = { ...EMPTY, sourceKind: this.source.kind, sourceLabel: this.source.label };
+    this.deriveSlices();
     this.flush();
   }
 
@@ -261,23 +280,27 @@ class DetectionHub {
         void this.handleDeviceLost();
       },
     });
+    const ticket = ++this.operation;
+    const previous = this.source;
+    this.unsubscribeSource?.();
+    this.resetStages();
+    this.source = microphone;
+    this.unsubscribeSource = microphone.onFrame(this.handleFrame);
+    // Start synchronously from the gesture so AudioContext can be unlocked.
+    const started = microphone.start();
+    void started.catch(() => {});
     try {
-      await this.stop();
-      this.source = microphone;
-      await this.start();
-      this.patch({ starting: false, error: null, sourceLabel: microphone.label });
+      await previous.stop();
+      await started;
+      if (ticket !== this.operation) return;
+      this.patch({ listening: true, sourceKind: "microphone", starting: false, error: null, sourceLabel: microphone.label });
     } catch (error) {
-      // Fall back to the virtual instrument rather than leaving the app mute:
-      // a blocked microphone should degrade the experience, not end it.
+      await microphone.stop();
+      if (ticket !== this.operation) return;
+      this.unsubscribeSource?.();
       this.source = new MockPitchSource();
       await this.start();
-      this.patch({
-        starting: false,
-        error:
-          error instanceof MicrophonePermissionError
-            ? error.message
-            : `Could not open the microphone: ${(error as Error)?.message ?? "unknown error"}`,
-      });
+      this.patch({ starting: false, error: error instanceof Error ? error.message : "Could not open the audio input." });
     }
   }
 
@@ -292,7 +315,10 @@ class DetectionHub {
   async disable(): Promise<void> {
     // Releases the MediaStream and tears down the worklet and worker — nothing
     // keeps listening to a microphone the player switched off.
-    await this.stop();
+    const stopped = this.stop();
+    const ticket = this.operation;
+    await stopped;
+    if (ticket !== this.operation) return;
     this.deviceId = null;
 
     // Then fall back to the virtual instrument. The spec's "mic off, camera off"
@@ -306,7 +332,10 @@ class DetectionHub {
   }
 
   async useVirtualInstrument(): Promise<void> {
-    await this.stop();
+    const stopped = this.stop();
+    const ticket = this.operation;
+    await stopped;
+    if (ticket !== this.operation) return;
     this.source = new MockPitchSource();
     this.deviceId = null;
     await this.start();
@@ -315,7 +344,10 @@ class DetectionHub {
 
   /** The selected device disappeared — say so and keep the app usable. */
   private async handleDeviceLost(): Promise<void> {
-    await this.stop();
+    const stopped = this.stop();
+    const ticket = this.operation;
+    await stopped;
+    if (ticket !== this.operation) return;
     this.source = new MockPitchSource();
     this.deviceId = null;
     await this.start();
@@ -470,6 +502,11 @@ class DetectionHub {
       noteEventId: this.noteCounter,
     };
 
+    if (this.source.kind === "microphone") captureEvents.push(this.source.now(), {
+      kind: "note", midi: committed ? display.midi : null,
+      frequency: committed ? display.reading?.frequency ?? null : null,
+      confidence: committed ? verdict.confidence : 0,
+    });
     this.deriveSlices();
     this.dispatch(event, frame);
     this.scheduleFlush();

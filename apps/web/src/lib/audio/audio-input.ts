@@ -57,7 +57,7 @@ export function classifyDevice(label: string): InputType {
 
 export async function listInputs(): Promise<AudioInputDevice[]> {
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return [];
-  const devices = await navigator.mediaDevices.enumerateDevices();
+  const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
   return devices
     .filter((device) => device.kind === "audioinput")
     .map((device) => ({
@@ -75,10 +75,8 @@ export function devicesOfType(
   devices: readonly AudioInputDevice[],
   type: InputType,
 ): AudioInputDevice[] {
-  const matching = devices.filter((device) => device.type === type);
-  // Never strand the user: if the heuristic found nothing of this type, show
-  // everything rather than an empty dropdown they cannot escape from.
-  return matching.length > 0 ? matching : [...devices];
+  // Preference order only: labels are heuristics, so every device stays selectable.
+  return [...devices].sort((a, b) => Number(b.type === type) - Number(a.type === type));
 }
 
 /**
@@ -92,7 +90,7 @@ export function watchDevices(onChange: (devices: AudioInputDevice[]) => void): (
     return () => {};
   }
   const handler = () => {
-    void listInputs().then(onChange);
+    void listInputs().then(onChange).catch(() => {});
   };
   navigator.mediaDevices.addEventListener("devicechange", handler);
   return () => navigator.mediaDevices.removeEventListener("devicechange", handler);

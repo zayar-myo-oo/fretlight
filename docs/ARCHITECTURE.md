@@ -14,8 +14,19 @@ and the SVG fretboard. There is no camera, 3D renderer, song analyzer, generator
 looper or separate practice dashboard.
 
 Live single notes use getUserMedia → AudioWorklet → Worker → detection hub.
-Chord input uses a separate chord listener; the Listen screen switches between
-the two consumers. Audio is processed on the device without uploads.
+Chord input uses an independent waveform FFT/chroma detector; the Listen screen
+switches between note and chord analysis. Both use the same capture owner, which
+serializes device opening and disposes replaced streams. MediaRecorder records
+that exact captured stream, without opening another microphone session. The
+software analysis gain does not change the raw recorded audio.
+
+Sessions store the audio Blob, tuning/fretboard, input settings, stop reason and
+detection transitions in IndexedDB. Events are relative to the AudioContext time
+at recorder.start(), and represent decision times, not estimated note onsets.
+Replay derives highlights from the audio element currentTime, including seeking.
+Codec/input offsets are not hardware-calibrated. Input interruption or switching
+ends and saves a take; recording is limited to five minutes or 32 MiB per take.
+Everything stays on the device unless the player exports it.
 
 Note playback uses recorded samples with a local modelled-string fallback.
 Pending playback is cancelled on Stop. The metronome schedules clicks on the

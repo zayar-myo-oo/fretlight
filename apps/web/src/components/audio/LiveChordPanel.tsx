@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { type AudioInputDevice, classifyDevice, listInputs, watchDevices } from "@/lib/audio/audio-input";
 import { ChordListener, type ChordFrame } from "@/lib/audio/chord-listener";
+import { Fretboard } from "@/components/fretboard/Fretboard";
+import { useFretboardContext } from "@/hooks/useFretboard";
+import { detectionMarkers } from "@/lib/audio/detection-markers";
 import { useTx } from "@/lib/i18n/locale";
 
 function describeError(error: unknown): string {
@@ -34,6 +37,10 @@ export function LiveChordPanel({
   footer?: ReactNode;
   title?: string;
 }) {
+  const { board } = useFretboardContext();
+  const mounted = useRef(true);
+  const request = useRef(0);
+  const [busy, setBusy] = useState(false);
   const listener = useRef<ChordListener | null>(null);
   const x = useTx();
   const lastSymbol = useRef<string | null>(null);
@@ -51,32 +58,37 @@ export function LiveChordPanel({
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     const current = listener.current ?? (listener.current = new ChordListener());
-    return () => void current.stop();
+    return () => { mounted.current = false; ++request.current; void current.stop(); };
   }, []);
 
   const handleFrame = useCallback((next: ChordFrame) => {
     setFrame(next);
     const symbol = next.chord?.symbol ?? null;
     if (next.chord && symbol !== lastSymbol.current) {
-      lastSymbol.current = symbol;
       onChordRef.current?.(next.chord);
     }
+    lastSymbol.current = symbol;
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (id = deviceId) => {
+    const ticket = ++request.current;
     setError(null);
+    setBusy(true);
     const current = listener.current ?? (listener.current = new ChordListener());
-    const label = devices.find((d) => d.deviceId === deviceId)?.label ?? "";
+    const label = devices.find((d) => d.deviceId === id)?.label ?? "";
     try {
-      await current.start(deviceId, label, handleFrame);
-      setRunning(true);
+      await current.start(id, label, handleFrame, () => { setRunning(false); setFrame(null); setError("Input disconnected. Reconnect and start again."); });
+      if (!mounted.current || ticket !== request.current) return;
+      setRunning(current.running);
       // Labels only appear once permission is granted, so refresh the list now.
       setDevices(await listInputs());
     } catch (e) {
+      if (!mounted.current || ticket !== request.current) return;
       setRunning(false);
       setError(describeError(e));
-    }
+    } finally { if (mounted.current && ticket === request.current) setBusy(false); }
   }, [deviceId, devices, handleFrame]);
 
   const stop = useCallback(async () => {
@@ -89,13 +101,7 @@ export function LiveChordPanel({
   // Switching device while listening should just work.
   const onDevice = (id: string) => {
     setDeviceId(id);
-    if (running) {
-      const label = devices.find((d) => d.deviceId === id)?.label ?? "";
-      listener.current?.start(id, label, handleFrame).catch((e) => {
-        setRunning(false);
-        setError(describeError(e));
-      });
-    }
+    if (running) void start(id);
   };
 
   const chord = frame?.chord ?? null;
@@ -112,6 +118,7 @@ export function LiveChordPanel({
           <label className="flex items-center gap-2">
             <span className="hud-label">{x("Input")}</span>
             <select
+              disabled={busy}
               value={deviceId}
               onChange={(e) => onDevice(e.target.value)}
               className="h-9 min-w-[180px] max-w-[260px] rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-3 text-xs text-[var(--color-ink-dim)]"
@@ -132,7 +139,7 @@ export function LiveChordPanel({
               {x("■ Stop listening")}
             </Button>
           ) : (
-            <Button size="sm" variant="primary" onClick={() => void start()}>
+            <Button size="sm" disabled={busy} variant="primary" onClick={() => void start()}>
               {x("● Start listening")}
             </Button>
           )}
@@ -142,7 +149,7 @@ export function LiveChordPanel({
 
         {!running && !error && (
           <p className="text-xs leading-relaxed text-[var(--color-ink-dim)]">
-            {x("Plug in your guitar or bass interface (or use a microphone), press Start, and strum a chord. Everything is analysed on this device; no audio is recorded or sent.")}
+            {x("Plug in your guitar or bass interface (or use a microphone), press Start, and strum a chord. Audio stays on this device. Use Record take to save a performance.")}
           </p>
         )}
 
@@ -155,6 +162,7 @@ export function LiveChordPanel({
               />
             </div>
 
+            {frame && frame.peak >= 0.97 && <p role="status" className="text-xs text-[var(--color-error)]">Clipping — lower interface gain.</p>}
             <div>
               <span className="hud-label">{x("Detected chord")}</span>
               {chord ? (
@@ -173,7 +181,7 @@ export function LiveChordPanel({
 
             {frame && frame.notes.length > 0 && (
               <div>
-                <span className="hud-label">{x("Detected notes")}</span>
+                <span className="hud-label">Spectral pitch classes (may include harmonics)</span>
                 <p className="readout mt-1 text-sm">{frame.notes.map((pc) => SHARP_NAMES[pc]).join(" ")}</p>
               </div>
             )}
@@ -193,6 +201,8 @@ export function LiveChordPanel({
           </>
         )}
 
+        <Fretboard board={board} toFret={12} markers={detectionMarkers(board, { kind: "chord", chord, notes: frame?.notes ?? [] })} />
+        <p className="text-xs text-[var(--color-ink-faint)]">Frets 0–12 show chord-tone locations; pink marks the root. Audio does not establish a fingering or inversion. Ambiguous matches remain unlabelled.</p>
         {footer}
       </div>
     </Panel>

@@ -1,7 +1,7 @@
 "use client";
 
 import { type Fretboard, getInstrument, noteAt } from "@fretlight/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CalibrationPanel } from "@/components/audio/CalibrationPanel";
@@ -9,6 +9,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Slider } from "@/components/ui/Slider";
 import { useAudioState, useSignalState } from "@/hooks/useDetection";
+import { sharedInput } from "@/lib/audio/shared-input";
 import { detectionHub } from "@/lib/audio/detection-hub";
 import {
   type AudioInputDevice,
@@ -34,6 +35,7 @@ import { cn } from "@/lib/ui/cn";
 export function InputSourcePanel({ board, className }: { board: Fretboard; className?: string }) {
   const instrumentId = useSession((s) => s.instrumentId);
   const audio = useAudioState();
+  const contextState = useSyncExternalStore(sharedInput.subscribe, () => sharedInput.current?.context.state ?? "off", () => "off");
   const signal = useSignalState();
 
   const [inputType, setInputType] = useState<InputType>("microphone");
@@ -102,13 +104,15 @@ export function InputSourcePanel({ board, className }: { board: Fretboard; class
             onChange={(value) => {
               setInputType(value as InputType);
               setDeviceId("");
+              if (live) void open(value as InputType, "");
             }}
           />
 
           <label className="flex items-center gap-2">
             <span className="hud-label">Device</span>
             <select
-              value={deviceId}
+              disabled={audio.starting}
+          value={deviceId}
               onChange={(event) => {
                 const next = event.target.value;
                 setDeviceId(next);
@@ -118,7 +122,7 @@ export function InputSourcePanel({ board, className }: { board: Fretboard; class
               className="h-9 min-w-[180px] rounded-xl border border-[var(--color-hairline-bright)] bg-[var(--color-panel-raised)] px-3 text-xs text-[var(--color-ink-dim)]"
             >
               <option value="">
-                {inputType === "audio_interface" ? "Default interface" : "Default microphone"}
+                {"System default input"}
               </option>
               {visible.map((device) => (
                 <option key={device.deviceId} value={device.deviceId}>
@@ -149,7 +153,8 @@ export function InputSourcePanel({ board, className }: { board: Fretboard; class
           )}
         </div>
 
-        {audio.error && (
+        {contextState !== "off" && contextState !== "running" && <button onClick={() => void sharedInput.resume().catch(() => {})}>Resume audio input</button>}
+      {audio.error && (
           <p className="rounded-xl border border-[rgba(255,84,112,0.35)] bg-[rgba(255,84,112,0.08)] p-3 text-xs leading-relaxed text-[var(--color-ink-dim)]">
             {audio.error}
           </p>

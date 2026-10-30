@@ -305,7 +305,7 @@ export function Fretboard({
         )}
 
       {/* --- Markers --- */}
-      {markers.map((marker, markerIdx) => {
+      {markers.filter((m) => m.fret >= fromFret && m.fret <= lastFret).map((marker, markerIdx) => {
         const style = TONE_STYLES[marker.tone];
         const x = geometry.slotX(marker.fret);
         const y = geometry.stringY(marker.string);
@@ -319,7 +319,7 @@ export function Fretboard({
             // up-and-back exercise) legitimately yields two for one fret.
             key={
               marker.emphasis && activeEventId !== undefined
-                ? `marker-live-${activeEventId}`
+                ? `marker-live-${activeEventId}-${marker.string}-${marker.fret}`
                 : `marker-${markerIdx}-${marker.string}-${marker.fret}`
             }
             className={marker.emphasis ? "animate-note-pop" : undefined}

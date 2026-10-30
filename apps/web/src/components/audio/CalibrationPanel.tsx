@@ -41,7 +41,7 @@ export function CalibrationPanel({ live }: { live: boolean }) {
       <div className="flex items-center justify-between">
         <h3 className="hud-label">Calibration</h3>
         <span className="readout text-[10px] text-[var(--color-ink-faint)]">
-          {latencyMs === null ? "latency —" : `latency ~${latencyMs}ms`}
+          {latencyMs === null ? "output latency —" : `browser output latency ~${latencyMs}ms`}
         </span>
       </div>
 
